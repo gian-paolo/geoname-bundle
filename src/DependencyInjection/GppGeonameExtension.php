@@ -14,15 +14,20 @@ class GppGeonameExtension extends Extension
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
 
-        $container->setParameter('gpp_geoname.entities.geoname', $config['entities']['geoname']);
-        $container->setParameter('gpp_geoname.entities.country', $config['entities']['country']);
-        $container->setParameter('gpp_geoname.entities.import', $config['entities']['import']);
+        // Entities
+        foreach ($config['entities'] as $key => $value) {
+            $container->setParameter('gpp_geoname.entities.' . $key, $value);
+        }
+
+        // Tables
+        foreach ($config['tables'] as $key => $value) {
+            $container->setParameter('gpp_geoname.tables.' . $key, $value);
+        }
         
-        $container->setParameter('gpp_geoname.tables.geoname', $config['tables']['geoname']);
-        $container->setParameter('gpp_geoname.tables.country', $config['tables']['country']);
-        $container->setParameter('gpp_geoname.tables.import', $config['tables']['import']);
-        
+        // Other config
         $container->setParameter('gpp_geoname.temp_dir', $config['temp_dir']);
+        $container->setParameter('gpp_geoname.alternate_names.enabled', $config['alternate_names']['enabled']);
+        $container->setParameter('gpp_geoname.alternate_names.languages', $config['alternate_names']['languages']);
 
         $loader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.yaml');

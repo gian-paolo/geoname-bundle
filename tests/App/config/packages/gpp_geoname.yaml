@@ -1,0 +1,12 @@
+gpp_geoname:
+    entities:
+        geoname: 'Gpp\GeonameBundle\Tests\App\Entity\GeoName'
+        country: 'Gpp\GeonameBundle\Tests\App\Entity\GeoCountry'
+        import: 'Gpp\GeonameBundle\Tests\App\Entity\DataImport'
+        admin1: 'Gpp\GeonameBundle\Tests\App\Entity\GeoAdmin1'
+        admin2: 'Gpp\GeonameBundle\Tests\App\Entity\GeoAdmin2'
+        alternate_name: 'Gpp\GeonameBundle\Tests\App\Entity\GeoAlternateName'
+        hierarchy: 'Gpp\GeonameBundle\Tests\App\Entity\GeoHierarchy'
+    alternate_names:
+        enabled: true
+        languages: ['it', 'en']

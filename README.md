@@ -1,11 +1,10 @@
 # GppGeonameBundle
 
-[![Symfony](https://img.shields.io/badge/Symfony-%5E6.4%20%7C%20%5E7.0-000000?style=flat-square&logo=symfony)](https://symfony.com)
+[![Symfony](https://img.shields.io/badge/Symfony-%5E6.4%20%7C%20%5E7.0%20%7C%20%5E8.0-000000?style=flat-square&logo=symfony)](https://symfony.com)
 [![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-777bb4?style=flat-square&logo=php)](https://php.net)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0--beta-orange?style=flat-square)](https://github.com/gian-paolo/gpp-geoname-bundle)
 
-**GppGeonameBundle** è la soluzione professionale per integrare e mantenere aggiornati i dati geografici di [GeoNames](https://www.geonames.org/) nelle tue applicazioni Symfony. 
-
+**GppGeonameBundle** è una soluzione sperimentale ad alte prestazioni per integrare e mantenere aggiornati i dati geografici di [GeoNames](https://www.geonames.org/) nelle tue applicazioni Symfony.
 A differenza di altri bundle, questo è progettato per gestire **milioni di record** con un consumo di memoria minimo e un sistema di **aggiornamento quotidiano incrementale** (sync) che evita di dover ricaricare l'intero database ogni volta.
 
 ---

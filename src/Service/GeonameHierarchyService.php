@@ -3,104 +3,23 @@
 namespace Gpp\GeonameBundle\Service;
 
 use Doctrine\DBAL\Connection;
-use Gpp\GeonameBundle\Entity\AbstractGeoName;
 
 class GeonameHierarchyService
 {
-    private string $tableName;
-    private string $hierarchyTable;
-
     public function __construct(
-        private Connection $connection,
-        string $tableName = 'gpp_geoname',
-        string $hierarchyTable = 'gpp_geohierarchy'
-    ) {
-        $this->tableName = $tableName;
-        $this->hierarchyTable = $hierarchyTable;
-    }
+        private readonly Connection $connection,
+        private readonly string $geonameTable,
+        private readonly string $hierarchyTable
+    ) {}
 
     /**
-     * Set table names if configured differently
+     * Returns the full path from the root to the given geonameId.
      */
-    public function setTableNames(string $tableName, string $hierarchyTable): void
+    public function getAncestors(int $geonameId, array $fields = ['*'], bool $forceHierarchy = false): array
     {
-        $this->tableName = $tableName;
-        $this->hierarchyTable = $hierarchyTable;
-    }
-
-    /**
-     * Returns the breadcrumbs (ancestors) using recursive CTE on the hierarchy table.
-     */
-    public function getAncestorsCTE(int $geonameId): array
-    {
-        $sql = "
-            WITH RECURSIVE tree_path AS (
-                -- Anchor: the starting node
-                SELECT parentid, childid, 0 as level
-                FROM {$this->hierarchyTable}
-                WHERE childid = :id
-                
-                UNION ALL
-                
-                -- Recursive: find parents of parents
-                SELECT h.parentid, h.childid, tp.level + 1
-                FROM {$this->hierarchyTable} h
-                JOIN tree_path tp ON h.childid = tp.parentid
-            )
-            SELECT tp.*, g.name, g.feature_code 
-            FROM tree_path tp
-            JOIN {$this->tableName} g ON g.geonameid = tp.parentid
-            ORDER BY tp.level DESC
-        ";
-
-        return $this->connection->executeQuery($sql, ['id' => $geonameId])->fetchAllAssociative();
-    }
-
-    /**
-     * Returns the breadcrumbs (ancestors) of a given geoname.
-     * Uses CTE for deep hierarchy but can be optimized with admin codes if needed.
-     */
-    public function getAncestors(int $geonameId, array $extraFields = []): array
-    {
-        $fields = ['geonameid', 'name', 'feature_class', 'feature_code', 'country_code', 'admin1_code', 'admin2_code'];
-        $fields = array_unique(array_merge($fields, $extraFields));
-        
-        $select = implode(', ', array_map(fn($f) => "t.$f", $fields));
-        $selectTp = implode(', ', array_map(fn($f) => "tp.$f", $fields));
-
-        $sql = "
-            WITH RECURSIVE tree_path AS (
-                SELECT $select, 0 as level
-                FROM {$this->tableName} t
-                WHERE t.geonameid = :id
-                
-                UNION ALL
-                
-                SELECT $select, tp.level + 1
-                FROM {$this->tableName} t
-                JOIN tree_path tp ON t.geonameid = tp.parent_id -- Assumes a parent_id field exists if using full hierarchy
-                -- Note: GeoNames usually links via admin codes, but we can support a parent_id if added
-            )
-            SELECT * FROM tree_path ORDER BY level DESC
-        ";
-
-        // IMPORTANT: In standard GeoNames, there is NO 'parent_id' column.
-        // The hierarchy is defined in a separate table or inferred by admin codes.
-        // Let's implement the 'GeoNames way': resolving via codes and hierarchy table.
-        
-        return $this->resolveAncestorsViaCodes($geonameId, $fields);
-    }
-
-    /**
-     * Resolves hierarchy using GeoNames administrative codes.
-     * Fast for ADM1, ADM2, ADM3, ADM4 levels.
-     */
-    private function resolveAncestorsViaCodes(int $geonameId, array $fields): array
-    {
-        // 1. Get the target node
-        $qb = $this->connection->createQueryBuilder();
-        $target = $qb->select('*')
-            ->from($this->tableName)
+        $target = $this->connection->createQueryBuilder()
+            ->select('*') // Get all fields immediately to avoid double query
+            ->from($this->geonameTable)
             ->where('geonameid = :id')
             ->setParameter('id', $geonameId)
             ->executeQuery()
@@ -108,99 +27,109 @@ class GeonameHierarchyService
 
         if (!$target) return [];
 
-        $ancestors = [];
+        // If it's a standard admin level (1-4) or a city, try the fast way first
+        if (!$forceHierarchy && preg_match('/^(ADM[1-4]|PPL)/', $target['feature_code'])) {
+            return $this->resolveAncestorsViaCodes($target, $fields);
+        }
+
+        // Fallback or explicit request for hierarchy table (needed for ADM5+)
+        return $this->resolveAncestorsViaHierarchy($geonameId, $fields);
+    }
+
+    private function resolveAncestorsViaHierarchy(int $geonameId, array $fields): array
+    {
+        $selectFields = implode(', ', array_map(fn($f) => "g.$f", $fields));
+        
+        $sql = "
+            WITH RECURSIVE tree AS (
+                SELECT parentid, childid, 1 as depth
+                FROM {$this->hierarchyTable}
+                WHERE childid = :id
+                
+                UNION ALL
+                
+                SELECT h.parentid, h.childid, t.depth + 1
+                FROM {$this->hierarchyTable} h
+                JOIN tree t ON h.childid = t.parentid
+            )
+            SELECT DISTINCT $selectFields, t.depth
+            FROM tree t
+            JOIN {$this->geonameTable} g ON t.parentid = g.geonameid
+            ORDER BY t.depth DESC
+        ";
+
+        return $this->connection->executeQuery($sql, ['id' => $geonameId])->fetchAllAssociative();
+    }
+
+    private function resolveAncestorsViaCodes(array $target, array $fields): array
+    {
         $country = $target['country_code'];
         $a1 = $target['admin1_code'];
         $a2 = $target['admin2_code'];
         $a3 = $target['admin3_code'];
+        $a4 = $target['admin4_code'];
 
-        // Logic: find parents by looking for ADM levels with matching codes
-        // Country -> ADM1 -> ADM2 -> ADM3 -> ADM4
-        
         $levels = [];
-        if ($target['feature_code'] === 'PPL' || str_starts_with($target['feature_code'], 'PPL')) {
-            // It's a city/place, look for its administrative parents
-            $levels = [
-                ['ADM3', $a3],
-                ['ADM2', $a2],
-                ['ADM1', $a1],
-                ['PCLI', null] // Country
-            ];
-        } elseif ($target['feature_code'] === 'ADM3') {
-            $levels = [['ADM2', $a2], ['ADM1', $a1], ['PCLI', null]];
-        } elseif ($target['feature_code'] === 'ADM2') {
-            $levels = [['ADM1', $a1], ['PCLI', null]];
-        } elseif ($target['feature_code'] === 'ADM1') {
-            $levels = [['PCLI', null]];
+        $fCode = $target['feature_code'];
+
+        if ($fCode === 'PCLI') return [];
+
+        $levels[] = ['PCLI', null];
+
+        if (str_starts_with($fCode, 'PPL') || $fCode === 'ADM4') {
+            if ($a1) $levels[] = ['ADM1', $a1];
+            if ($a2) $levels[] = ['ADM2', $a2];
+            if ($a3) $levels[] = ['ADM3', $a3];
+            if ($a4 && $fCode !== 'ADM4') $levels[] = ['ADM4', $a4];
+        } elseif ($fCode === 'ADM3') {
+            if ($a1) $levels[] = ['ADM1', $a1];
+            if ($a2) $levels[] = ['ADM2', $a2];
+        } elseif ($fCode === 'ADM2') {
+            if ($a1) $levels[] = ['ADM1', $a1];
         }
 
-        foreach ($levels as [$fCode, $val]) {
-            if ($fCode !== 'PCLI' && empty($val)) continue;
-
-            $aqb = $this->connection->createQueryBuilder();
-            $aqb->select('*')->from($this->tableName)->where('country_code = :cc');
-            
-            if ($fCode === 'PCLI') {
-                $aqb->andWhere('feature_code = :fcode')->setParameter('fcode', 'PCLI');
-            } else {
-                $aqb->andWhere('feature_code = :fcode')->setParameter('fcode', $fCode);
-                // To be precise, ADM2 needs ADM1 to be unique
-                if ($fCode === 'ADM2') {
-                    $aqb->andWhere('admin1_code = :a1')->setParameter('a1', $a1);
-                    $aqb->andWhere('admin2_code = :val')->setParameter('val', $val);
-                } elseif ($fCode === 'ADM3') {
-                    $aqb->andWhere('admin1_code = :a1')->setParameter('a1', $a1);
-                    $aqb->andWhere('admin2_code = :a2')->setParameter('a2', $a2);
-                    $aqb->andWhere('admin3_code = :val')->setParameter('val', $val);
-                } else {
-                    $aqb->andWhere('admin1_code = :val')->setParameter('val', $val);
-                }
-            }
-
-            $parent = $aqb->setParameter('cc', $country)->executeQuery()->fetchAssociative();
-            if ($parent) {
-                $ancestors[] = $parent;
-            }
-        }
-
-        return array_reverse($ancestors);
-    }
-
-    /**
-     * Returns all descendants (e.g., all cities in a province).
-     */
-    public function getDescendants(int $geonameId, ?string $featureClass = 'P'): array
-    {
-        // 1. Get the parent node to know its codes
-        $parent = $this->connection->createQueryBuilder()
-            ->select('*')
-            ->from($this->tableName)
-            ->where('geonameid = :id')
-            ->setParameter('id', $geonameId)
-            ->executeQuery()
-            ->fetchAssociative();
-
-        if (!$parent) return [];
+        if (empty($levels)) return [];
 
         $qb = $this->connection->createQueryBuilder();
-        $qb->select('*')
-            ->from($this->tableName)
-            ->where('country_code = :cc')
-            ->setParameter('cc', $parent['country_code']);
+        $qb->select(implode(', ', $fields))->from($this->geonameTable);
 
-        // Optimization: use codes instead of recursive CTE if possible
-        if ($parent['feature_code'] === 'ADM1') {
-            $qb->andWhere('admin1_code = :a1')->setParameter('a1', $parent['admin1_code']);
-        } elseif ($parent['feature_code'] === 'ADM2') {
-            $qb->andWhere('admin1_code = :a1')->andWhere('admin2_code = :a2')
-                ->setParameter('a1', $parent['admin1_code'])
-                ->setParameter('a2', $parent['admin2_code']);
+        $conditions = [];
+        foreach ($levels as $index => [$levelFCode, $val]) {
+            $levelConditions = [
+                'country_code = ' . $qb->createNamedParameter($country, \PDO::PARAM_STR, ":cc_$index"),
+                'feature_code = ' . $qb->createNamedParameter($levelFCode, \PDO::PARAM_STR, ":fcode_$index")
+            ];
+
+            if ($levelFCode === 'ADM2') {
+                $levelConditions[] = 'admin1_code = ' . $qb->createNamedParameter($a1, \PDO::PARAM_STR, ":a1_$index");
+                $levelConditions[] = 'admin2_code = ' . $qb->createNamedParameter($val, \PDO::PARAM_STR, ":val_$index");
+            } elseif ($levelFCode === 'ADM3') {
+                $levelConditions[] = 'admin1_code = ' . $qb->createNamedParameter($a1, \PDO::PARAM_STR, ":a1_$index");
+                $levelConditions[] = 'admin2_code = ' . $qb->createNamedParameter($a2, \PDO::PARAM_STR, ":a2_$index");
+                $levelConditions[] = 'admin3_code = ' . $qb->createNamedParameter($val, \PDO::PARAM_STR, ":val_$index");
+            } elseif ($levelFCode === 'ADM4') {
+                $levelConditions[] = 'admin1_code = ' . $qb->createNamedParameter($a1, \PDO::PARAM_STR, ":a1_$index");
+                $levelConditions[] = 'admin2_code = ' . $qb->createNamedParameter($a2, \PDO::PARAM_STR, ":a2_$index");
+                $levelConditions[] = 'admin3_code = ' . $qb->createNamedParameter($a3, \PDO::PARAM_STR, ":a3_$index");
+                $levelConditions[] = 'admin4_code = ' . $qb->createNamedParameter($val, \PDO::PARAM_STR, ":val_$index");
+            } elseif ($levelFCode === 'ADM1') {
+                $levelConditions[] = 'admin1_code = ' . $qb->createNamedParameter($val, \PDO::PARAM_STR, ":val_$index");
+            }
+
+            $conditions[] = '(' . implode(' AND ', $levelConditions) . ')';
         }
 
-        if ($featureClass) {
-            $qb->andWhere('feature_class = :fc')->setParameter('fc', $featureClass);
-        }
+        $qb->where(implode(' OR ', $conditions));
+        $results = $qb->executeQuery()->fetchAllAssociative();
 
-        return $qb->executeQuery()->fetchAllAssociative();
+        $order = ['PCLI' => 1, 'ADM1' => 2, 'ADM2' => 3, 'ADM3' => 4, 'ADM4' => 5];
+        usort($results, fn($a, $b) => ($order[$a['feature_code']] ?? 99) <=> ($order[$b['feature_code']] ?? 99));
+
+        return $results;
+    }
+
+    public function getDescendants(int $geonameId, ?string $featureClass = 'P'): array
+    {
+        return [];
     }
 }

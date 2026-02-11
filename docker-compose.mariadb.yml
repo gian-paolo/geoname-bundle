@@ -1,0 +1,19 @@
+services:
+  mariadb:
+    image: mariadb:11.8
+    container_name: geoname_mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: geoname_test
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./test/docker-data/mariadb:/var/lib/mysql
+
+  adminer:
+    image: adminer
+    container_name: geoname_adminer
+    ports:
+      - "8081:8080"

@@ -23,16 +23,16 @@ abstract class AbstractDataImport
     #[ORM\Column(length: 20)]
     protected ?string $status = null;
 
-    #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    #[ORM\Column(name: 'started_at', type: Types::DATETIME_MUTABLE)]
     protected ?\DateTimeInterface $startedAt = null;
 
-    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[ORM\Column(name: 'ended_at', type: Types::DATETIME_MUTABLE, nullable: true)]
     protected ?\DateTimeInterface $endedAt = null;
 
-    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\Column(name: 'records_processed', type: Types::INTEGER)]
     protected int $recordsProcessed = 0;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[ORM\Column(name: 'error_message', type: Types::TEXT, nullable: true)]
     protected ?string $errorMessage = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]

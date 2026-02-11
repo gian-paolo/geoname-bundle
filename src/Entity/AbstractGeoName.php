@@ -15,10 +15,10 @@ abstract class AbstractGeoName
     #[ORM\Column(length: 200)]
     protected ?string $name = null;
 
-    #[ORM\Column(length: 200)]
+    #[ORM\Column(name: 'ascii_name', length: 200)]
     protected ?string $asciiname = null;
 
-    #[ORM\Column(type: Types::TEXT, length: 10000, nullable: true)]
+    #[ORM\Column(name: 'alternate_names', type: Types::TEXT, length: 10000, nullable: true)]
     protected ?string $alternatenames = null;
 
     #[ORM\Column(type: Types::FLOAT)]
@@ -60,7 +60,7 @@ abstract class AbstractGeoName
     #[ORM\Column(name: 'modification_date', type: Types::DATE_MUTABLE, nullable: true)]
     protected ?\DateTimeInterface $modificationDate = null;
 
-    #[ORM\Column]
+    #[ORM\Column(name: 'is_deleted')]
     protected bool $isDeleted = false;
 
     // Getters e Setters ... (li ometto per brevità nella creazione iniziale, ma ci saranno)

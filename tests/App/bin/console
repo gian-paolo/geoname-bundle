@@ -1,0 +1,16 @@
+#!/usr/bin/env php
+<?php
+
+use Gpp\GeonameBundle\Tests\App\Kernel;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Dotenv\Dotenv;
+
+require __DIR__ . '/../../../vendor/autoload.php';
+
+if (file_exists(__DIR__ . '/../../.env.test')) {
+    (new Dotenv())->loadEnv(__DIR__ . '/../../.env.test');
+}
+
+$kernel = new Kernel('dev', true);
+$application = new Application($kernel);
+$application->run();

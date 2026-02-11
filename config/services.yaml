@@ -1,14 +1,20 @@
 services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    Gpp\GeonameBundle\Service\GeonameParser: ~
+
     Gpp\GeonameBundle\Service\GeonameHierarchyService:
         arguments:
             $connection: '@database_connection'
-            $tableName: '%gpp_geoname.tables.geoname%'
+            $geonameTable: '%gpp_geoname.tables.geoname%'
+            $hierarchyTable: '%gpp_geoname.tables.hierarchy%'
 
     Gpp\GeonameBundle\Service\GeonameImporter:
         arguments:
             $em: '@doctrine.orm.entity_manager'
             $httpClient: '@http_client'
-            $parser: '@Gpp\GeonameBundle\Service\GeonameParser'
             $tmpDir: '%gpp_geoname.temp_dir%'
         calls:
             - [setEntityClasses, ['%gpp_geoname.entities.geoname%', '%gpp_geoname.entities.import%']]
@@ -17,7 +23,6 @@ services:
     Gpp\GeonameBundle\Command\SyncGeonameCommand:
         arguments:
             $em: '@doctrine.orm.entity_manager'
-            $importer: '@Gpp\GeonameBundle\Service\GeonameImporter'
             $geonameEntityClass: '%gpp_geoname.entities.geoname%'
             $importEntityClass: '%gpp_geoname.entities.import%'
             $countryEntityClass: '%gpp_geoname.entities.country%'
@@ -25,7 +30,6 @@ services:
 
     Gpp\GeonameBundle\Command\ImportAdminCodesCommand:
         arguments:
-            $importer: '@Gpp\GeonameBundle\Service\GeonameImporter'
             $admin1EntityClass: '%gpp_geoname.entities.admin1%'
             $admin2EntityClass: '%gpp_geoname.entities.admin2%'
         tags: ['console.command']

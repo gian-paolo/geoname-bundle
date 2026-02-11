@@ -15,10 +15,10 @@ abstract class AbstractGeoCountry
     #[ORM\Column(length: 100)]
     protected ?string $name = null;
 
-    #[ORM\Column]
+    #[ORM\Column(name: 'is_enabled')]
     protected bool $isEnabled = true;
 
-    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[ORM\Column(name: 'last_imported_at', type: Types::DATETIME_MUTABLE, nullable: true)]
     protected ?\DateTimeInterface $lastImportedAt = null;
 
     public function getCode(): ?string { return $this->code; }
