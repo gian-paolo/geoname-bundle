@@ -1,0 +1,5 @@
+framework:
+    secret: 'S0ME_SECRET'
+    test: true
+    http_client:
+        enabled: true

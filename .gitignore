@@ -1,8 +1,31 @@
+# Dependency directories
 /vendor/
+
+# Symfony specific
 /var/
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/*.dev.libsodium.php
+/config/secrets/*.test.libsodium.php
+
+# Testing & Quality
+/.phpunit.result.cache
+/.php-cs-fixer.cache
 /tests/temp/
-.phpunit.result.cache
-.php-cs-fixer.cache
-composer.lock
-.env.local
+/phpunit.xml
+
+# IDEs
+/.idea/
+/.vscode/
+*.swp
+*~
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Composer
+# For bundles/libraries, it's common to ignore composer.lock 
+# to test against different dependency versions.
+composer.lock

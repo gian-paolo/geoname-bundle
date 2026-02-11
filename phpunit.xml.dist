@@ -6,8 +6,14 @@
     <testsuites>
         <testsuite name="GppGeonameBundle Test Suite">
             <directory>tests</directory>
+            <exclude>tests/App</exclude>
         </testsuite>
     </testsuites>
+
+    <php>
+        <env name="KERNEL_CLASS" value="Gpp\GeonameBundle\Tests\App\Kernel"/>
+        <env name="APP_ENV" value="test"/>
+    </php>
 
     <coverage>
         <include>
