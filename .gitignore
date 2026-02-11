@@ -1,0 +1,8 @@
+/vendor/
+/var/
+/tests/temp/
+.phpunit.result.cache
+.php-cs-fixer.cache
+composer.lock
+.env.local
+.DS_Store
