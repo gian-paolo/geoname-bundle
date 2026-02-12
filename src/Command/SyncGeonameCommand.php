@@ -34,12 +34,11 @@ class SyncGeonameCommand extends Command
         bool $alternateNamesEnabled = false,
         bool $admin5Enabled = false,
         string $geonameTable = 'geoname',
-        private array $adminTables = []
+        array $adminTables = []
     ) {
         parent::__construct();
         $this->importer->setEntityClasses($geonameEntityClass, $importEntityClass, $alternateNameEntityClass);
         $this->importer->setAdminTableNames($adminTables);
-        $this->importer->setTableNames($importEntityClass); // Actually setTableNames expects import table, will fix
         $this->countryEntityClass = $countryEntityClass;
         $this->languageEntityClass = $languageEntityClass;
         $this->alternateNamesEnabled = $alternateNamesEnabled;

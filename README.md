@@ -65,6 +65,11 @@ pallari_geoname:
     # Optional: Enable Admin5 codes import (separate global file)
     admin5:
         enabled: true
+
+    # Optional: Customize table names or add a prefix
+    table_prefix: 'geo_'
+    tables:
+        geoname: 'my_geoname' # Overrides geoname table name (prefix will be added if set)
 ```
 
 ### Entity Setup

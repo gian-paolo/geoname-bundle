@@ -27,8 +27,8 @@ services:
             $httpClient: '@http_client'
             $tmpDir: '%pallari_geoname.temp_dir%'
         calls:
-            - [setEntityClasses, ['%pallari_geoname.entities.geoname%', '%pallari_geoname.entities.import%']]
-            - [setTableNames, ['%pallari_geoname.tables.import%']]
+            - [setEntityClasses, ['%pallari_geoname.entities.geoname%', '%pallari_geoname.entities.import%', '%pallari_geoname.entities.alternate_name%']]
+            - [setTableNames, ['%pallari_geoname.tables.import%', '%pallari_geoname.tables.hierarchy%', '%pallari_geoname.tables.alternate_name%']]
 
     Pallari\GeonameBundle\Command\SyncGeonameCommand:
         arguments:

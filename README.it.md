@@ -63,6 +63,11 @@ pallari_geoname:
     # Opzionale: Abilita importazione codici Admin5 (file globale separato)
     admin5:
         enabled: true
+
+    # Opzionale: Personalizza i nomi delle tabelle o aggiungi un prefisso
+    table_prefix: 'geo_'
+    tables:
+        geoname: 'my_geoname' # Sovrascrive il nome della tabella geoname (il prefisso verrà aggiunto se impostato)
 ```
 
 ### Setup delle Entità

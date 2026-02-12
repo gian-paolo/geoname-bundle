@@ -14,6 +14,8 @@ class GeonameImporter
     private string $importEntityClass;
     private string $alternateNameEntityClass;
     private string $importTableName;
+    private string $hierarchyTableName = 'geohierarchy';
+    private string $alternateNameTableName = 'geoalternatename';
     private array $adminTableNames = [];
     /** @var GeonameRepository */
     private $repository;
@@ -44,9 +46,11 @@ class GeonameImporter
         $this->adminTableNames = $tables;
     }
 
-    public function setTableNames(string $importTableName): void
+    public function setTableNames(string $importTableName, string $hierarchyTableName = 'geohierarchy', string $alternateNameTableName = 'geoalternatename'): void
     {
         $this->importTableName = $importTableName;
+        $this->hierarchyTableName = $hierarchyTableName;
+        $this->alternateNameTableName = $alternateNameTableName;
     }
 
     public function importFull(string $url, ?array $allowedCountries = null): void
@@ -82,8 +86,6 @@ class GeonameImporter
 
         $total = 0;
         $conn = $this->em->getConnection();
-        // Assuming we have a configuration for this table name
-        $tableName = 'gpp_geohierarchy'; // Should be dynamic from config
 
         foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
             foreach ($batch as $row) {
@@ -91,7 +93,7 @@ class GeonameImporter
                 
                 $sql = sprintf(
                     "INSERT IGNORE INTO `%s` (parentid, childid, type) VALUES (?, ?, ?)",
-                    $tableName
+                    $this->hierarchyTableName
                 );
                 $conn->executeStatement($sql, [(int)$row[0], (int)$row[1], $row[2] ?? null]);
                 $total++;
@@ -191,8 +193,16 @@ class GeonameImporter
         $filePath = $this->downloadFile($url);
         $total = 0;
         $conn = $this->em->getConnection();
-        $metadata = $this->em->getClassMetadata($entityClass);
-        $tableName = $metadata->getTableName();
+        
+        // Find which admin level table to use
+        $tableName = null;
+        if (str_contains($url, 'admin1Codes')) $tableName = $this->adminTableNames['adm1'] ?? null;
+        elseif (str_contains($url, 'admin2Codes')) $tableName = $this->adminTableNames['adm2'] ?? null;
+
+        if (!$tableName) {
+            $metadata = $this->em->getClassMetadata($entityClass);
+            $tableName = $metadata->getTableName();
+        }
 
         foreach ($this->parser->getBatches($filePath, 500) as $batch) {
             foreach ($batch as $row) {
@@ -396,8 +406,7 @@ class GeonameImporter
         if (empty($ids)) return 0;
 
         $conn = $this->em->getConnection();
-        $metadata = $this->em->getClassMetadata($this->alternateNameEntityClass);
-        $tableName = $metadata->getTableName();
+        $tableName = $this->alternateNameTableName;
         
         $sql = sprintf("DELETE FROM `%s` WHERE alternatenameid IN (?)", $tableName);
         return $conn->executeStatement($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);

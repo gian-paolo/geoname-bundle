@@ -20,8 +20,9 @@ class PallariGeonameExtension extends Extension
         }
 
         // Tables
+        $prefix = $config['table_prefix'] ?? '';
         foreach ($config['tables'] as $key => $value) {
-            $container->setParameter('pallari_geoname.tables.' . $key, $value);
+            $container->setParameter('pallari_geoname.tables.' . $key, $prefix . $value);
         }
         
         // Other config
