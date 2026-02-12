@@ -22,6 +22,8 @@ class Configuration implements ConfigurationInterface
                         ->scalarNode('import')->defaultValue('App\Entity\DataImport')->end()
                         ->scalarNode('admin1')->defaultValue('App\Entity\GeoAdmin1')->end()
                         ->scalarNode('admin2')->defaultValue('App\Entity\GeoAdmin2')->end()
+                        ->scalarNode('admin3')->defaultValue('App\Entity\GeoAdmin3')->end()
+                        ->scalarNode('admin4')->defaultValue('App\Entity\GeoAdmin4')->end()
                         ->scalarNode('language')->defaultValue('App\Entity\GeoLanguage')->end()
                         ->scalarNode('alternate_name')->defaultValue('App\Entity\GeoAlternateName')->end()
                         ->scalarNode('hierarchy')->defaultValue('App\Entity\GeoHierarchy')->end()

@@ -12,6 +12,8 @@ class GeonameSearchService
         private readonly string $geonameTable,
         private readonly string $admin1Table,
         private readonly string $admin2Table,
+        private readonly string $admin3Table,
+        private readonly string $admin4Table,
         private readonly bool $useFulltext = false
     ) {}
 
@@ -60,13 +62,22 @@ class GeonameSearchService
 
         // Optional: Join Admin Names
         if ($options['with_admin_names'] ?? false) {
-            $qb->addSelect('a1.name as admin1_name', 'a1.geonameid as admin1_id', 'a2.name as admin2_name', 'a2.geonameid as admin2_id');
+            $qb->addSelect('a1.name as admin1_name', 'a1.geonameid as admin1_id', 
+                          'a2.name as admin2_name', 'a2.geonameid as admin2_id',
+                          'a3.name as admin3_name', 'a3.geonameid as admin3_id',
+                          'a4.name as admin4_name', 'a4.geonameid as admin4_id');
             
             // Join Admin1 (Region) - Key format is CC.ADM1
             $qb->leftJoin('g', $this->admin1Table, 'a1', 'a1.code = CONCAT(g.country_code, '.', g.admin1_code)');
             
             // Join Admin2 (Province) - Key format is CC.ADM1.ADM2
             $qb->leftJoin('g', $this->admin2Table, 'a2', 'a2.code = CONCAT(g.country_code, '.', g.admin1_code, '.', g.admin2_code)');
+
+            // Join Admin3 (Municipality/Comune) - Key format is CC.ADM1.ADM2.ADM3
+            $qb->leftJoin('g', $this->admin3Table, 'a3', 'a3.code = CONCAT(g.country_code, '.', g.admin1_code, '.', g.admin2_code, '.', g.admin3_code)');
+
+            // Join Admin4 - Key format is CC.ADM1.ADM2.ADM3.ADM4
+            $qb->leftJoin('g', $this->admin4Table, 'a4', 'a4.code = CONCAT(g.country_code, '.', g.admin1_code, '.', g.admin2_code, '.', g.admin3_code, '.', g.admin4_code)');
         }
 
         // Filters

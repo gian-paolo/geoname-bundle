@@ -53,6 +53,8 @@ class DemoSearchCommand extends Command
                 ['Population' => $res['population'] ?? 'N/A'],
                 ['Region (Admin1)' => sprintf('%s (ID: %s)', $res['admin1_name'] ?? 'N/A', $res['admin1_id'] ?? 'N/A')],
                 ['Province (Admin2)' => sprintf('%s (ID: %s)', $res['admin2_name'] ?? 'N/A', $res['admin2_id'] ?? 'N/A')],
+                ['Municipality (Admin3)' => sprintf('%s (ID: %s)', $res['admin3_name'] ?? 'N/A', $res['admin3_id'] ?? 'N/A')],
+                ['Local Dist (Admin4)' => sprintf('%s (ID: %s)', $res['admin4_name'] ?? 'N/A', $res['admin4_id'] ?? 'N/A')],
                 ['Feature Code' => $res['feature_code']]
             );
         }

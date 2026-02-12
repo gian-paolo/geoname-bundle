@@ -11,6 +11,8 @@ services:
             $geonameTable: '%pallari_geoname.tables.geoname%'
             $admin1Table: '%pallari_geoname.tables.admin1%'
             $admin2Table: '%pallari_geoname.tables.admin2%'
+            $admin3Table: '%pallari_geoname.tables.admin3%'
+            $admin4Table: '%pallari_geoname.tables.admin4%'
             $useFulltext: '%pallari_geoname.search.use_fulltext%'
 
     Pallari\GeonameBundle\Service\GeonameHierarchyService:

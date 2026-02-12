@@ -49,6 +49,8 @@ pallari_geoname:
         import: 'App\Entity\DataImport'     # Log delle importazioni
         admin1: 'App\Entity\GeoAdmin1'      # Nomi Regioni
         admin2: 'App\Entity\GeoAdmin2'      # Nomi Province
+        admin3: 'App\Entity\GeoAdmin3'      # Nomi Comuni (ADM3)
+        admin4: 'App\Entity\GeoAdmin4'      # Nomi Località (ADM4)
     
     # Abilita la sincronizzazione dei nomi alternativi
     alternate_names:
@@ -109,7 +111,8 @@ public function miaRicerca(GeonameSearchService $searchService)
     ]);
     
     // I risultati includono: geonameid, name, latitude, longitude, 
-    // population, admin1_name, admin1_id, admin2_name, admin2_id
+    // population, admin1_name, admin1_id, admin2_name, admin2_id,
+    // admin3_name, admin3_id, admin4_name, admin4_id
 }
 ```
 
