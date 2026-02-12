@@ -30,15 +30,22 @@ Sia che tu usi **MySQL**, **MariaDB** o **PostgreSQL**, otterrai le stesse prest
 
 ---
 
-## 🛠 Installazione
+## 🛠 Installazione e Setup Rapido
 
+1. **Installa il pacchetto**:
 ```bash
 composer require pallari/geoname-bundle
 ```
 
+2. **Lancia l'Installatore Interattivo**:
+Questo comando ti guiderà nella creazione delle entità, aggiornerà il database e lancerà la prima sincronizzazione:
+```bash
+php bin/console pallari:geoname:install
+```
+
 ---
 
-## 📝 Configurazione (Per Neofiti)
+## 📝 Configurazione (Riferimento)
 
 GeoNames fornisce moltissimi dati. Con questo bundle decidi tu cosa tenere nel database. Crea il file `config/packages/pallari_geoname.yaml`:
 

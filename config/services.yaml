@@ -48,6 +48,14 @@ services:
                 adm4: '%pallari_geoname.tables.admin4%'
         tags: ['console.command']
 
+    Pallari\GeonameBundle\Command\InstallCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+            $em: '@doctrine.orm.entity_manager'
+            $countryEntityClass: '%pallari_geoname.entities.country%'
+            $languageEntityClass: '%pallari_geoname.entities.language%'
+        tags: ['console.command']
+
     Pallari\GeonameBundle\Command\ImportAdminCodesCommand:
         arguments:
             $admin1EntityClass: '%pallari_geoname.entities.admin1%'
