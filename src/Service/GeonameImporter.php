@@ -88,16 +88,26 @@ class GeonameImporter
         $conn = $this->em->getConnection();
 
         foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
+            $values = [];
+            $placeholders = [];
             foreach ($batch as $row) {
                 if (count($row) < 2) continue;
                 
-                $sql = sprintf(
-                    "INSERT IGNORE INTO `%s` (parentid, childid, type) VALUES (?, ?, ?)",
-                    $this->hierarchyTableName
-                );
-                $conn->executeStatement($sql, [(int)$row[0], (int)$row[1], $row[2] ?? null]);
+                $placeholders[] = '(?, ?, ?)';
+                $values[] = (int)$row[0]; // parentid
+                $values[] = (int)$row[1]; // childid
+                $values[] = $row[2] ?? null; // type
                 $total++;
             }
+
+            if (empty($placeholders)) continue;
+
+            $sql = sprintf(
+                "INSERT IGNORE INTO `%s` (parentid, childid, type) VALUES %s",
+                $this->hierarchyTableName,
+                implode(', ', $placeholders)
+            );
+            $conn->executeStatement($sql, $values);
         }
         
         if (file_exists($filePath)) unlink($filePath);
@@ -377,12 +387,23 @@ class GeonameImporter
             $tableName = $this->adminTableNames[strtolower($level)] ?? null;
             if (!$tableName || empty($rows)) continue;
 
+            $values = [];
+            $placeholders = [];
             foreach ($rows as $row) {
-                $sql = "INSERT INTO `{$tableName}` (code, name, asciiname, geonameid) 
-                        VALUES (?, ?, ?, ?) 
-                        ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)";
-                $conn->executeStatement($sql, array_values($row));
+                $placeholders[] = '(?, ?, ?, ?)';
+                $values[] = $row['code'];
+                $values[] = $row['name'];
+                $values[] = $row['asciiname'];
+                $values[] = $row['geonameid'];
             }
+
+            $sql = sprintf(
+                "INSERT INTO `%s` (code, name, asciiname, geonameid) VALUES %s 
+                 ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)",
+                $tableName,
+                implode(', ', $placeholders)
+            );
+            $conn->executeStatement($sql, $values);
         }
     }
 
