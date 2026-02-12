@@ -100,7 +100,8 @@ For instant searches, add these indexes to your concrete entities:
 #[ORM\Index(columns: ['name', 'country_code'], name: 'idx_search')]
 
 // FULLTEXT index for fuzzy searches (MySQL/MariaDB only)
-#[ORM\Index(columns: ['name', 'asciiname'], name: 'idx_fulltext', flags: ['fulltext'])]
+// Now includes alternate_names for better global search results
+#[ORM\Index(columns: ['name', 'asciiname', 'alternatenames'], name: 'idx_fulltext', flags: ['fulltext'])]
 ```
 
 ---

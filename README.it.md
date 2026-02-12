@@ -98,7 +98,8 @@ Per ricerche istantanee, aggiungi questi indici alle tue entità concrete:
 #[ORM\Index(columns: ['name', 'country_code'], name: 'idx_search')]
 
 // Indice FULLTEXT per ricerche "fuzzy" (solo MySQL/MariaDB)
-#[ORM\Index(columns: ['name', 'asciiname'], name: 'idx_fulltext', flags: ['fulltext'])]
+// Include alternate_names per trovare città con nomi comuni diversi
+#[ORM\Index(columns: ['name', 'asciiname', 'alternatenames'], name: 'idx_fulltext', flags: ['fulltext'])]
 ```
 
 ### Esempio Query SQL
