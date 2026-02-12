@@ -76,8 +76,20 @@ pallari_geoname:
 To keep the bundle lightweight and customizable, **you must create your own entity classes** in your `src/Entity/` directory. These classes will extend the bundle's abstract classes.
 
 **1. Create the classes:**
-Create these files in `src/Entity/` (they can be empty classes, they just need to extend the bundle ones):
-- `GeoName.php`, `GeoCountry.php`, `GeoLanguage.php`, `DataImport.php`, `GeoAdmin1.php`, `GeoAdmin2.php`, `GeoAdmin3.php`, `GeoAdmin4.php`, `GeoAlternateName.php`, `GeoHierarchy.php`.
+Create these files in `src/Entity/`. Each class must extend the corresponding abstract class from the bundle:
+
+| Your Entity File | Class to Extend |
+| :--- | :--- |
+| `GeoName.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoName` |
+| `GeoCountry.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoCountry` |
+| `GeoLanguage.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoLanguage` |
+| `DataImport.php` | `\Pallari\GeonameBundle\Entity\AbstractDataImport` |
+| `GeoAdmin1.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin1` |
+| `GeoAdmin2.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin2` |
+| `GeoAdmin3.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin3` |
+| `GeoAdmin4.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin4` |
+| `GeoAlternateName.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAlternateName` |
+| `GeoHierarchy.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoHierarchy` |
 
 **Example for a city (`src/Entity/GeoName.php`):**
 ```php

@@ -74,8 +74,20 @@ pallari_geoname:
 Per mantenere il bundle leggero e flessibile, **devi creare le tue classi entità** nella cartella `src/Entity/` del tuo progetto. Queste classi estenderanno le classi astratte del bundle.
 
 **1. Crea le classi:**
-Crea questi file in `src/Entity/` (possono essere classi vuote, devono solo estendere quelle del bundle):
-- `GeoName.php`, `GeoCountry.php`, `GeoLanguage.php`, `DataImport.php`, `GeoAdmin1.php`, `GeoAdmin2.php`, `GeoAdmin3.php`, `GeoAdmin4.php`, `GeoAlternateName.php`, `GeoHierarchy.php`.
+Crea questi file in `src/Entity/`. Ogni classe deve estendere la corrispondente classe astratta del bundle:
+
+| Tuo File Entità | Classe da Estendere |
+| :--- | :--- |
+| `GeoName.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoName` |
+| `GeoCountry.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoCountry` |
+| `GeoLanguage.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoLanguage` |
+| `DataImport.php` | `\Pallari\GeonameBundle\Entity\AbstractDataImport` |
+| `GeoAdmin1.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin1` |
+| `GeoAdmin2.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin2` |
+| `GeoAdmin3.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin3` |
+| `GeoAdmin4.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin4` |
+| `GeoAlternateName.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAlternateName` |
+| `GeoHierarchy.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoHierarchy` |
 
 **Esempio per la città (`src/Entity/GeoName.php`):**
 ```php
