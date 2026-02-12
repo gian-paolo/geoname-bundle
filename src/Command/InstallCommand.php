@@ -45,30 +45,79 @@ class InstallCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $io->title('🌍 GeonameBundle - Interactive Installer');
 
-        // 1. Generate Entities
-        if ($io->confirm('Step 1: Generate entity files in src/Entity/?', true)) {
+        // 1. Generate Config YAML
+        if ($io->confirm('Step 1: Generate configuration file in config/packages/pallari_geoname.yaml?', true)) {
+            $this->generateConfig($io);
+        }
+
+        // 2. Generate Entities
+        if ($io->confirm('Step 2: Generate entity files in src/Entity/?', true)) {
             $this->generateEntities($io);
         }
 
-        // 2. Update Schema
-        if ($io->confirm('Step 2: Create/Update database schema?', true)) {
+        // 3. Update Schema
+        if ($io->confirm('Step 3: Create/Update database schema?', true)) {
             $this->runCommand('doctrine:schema:update', ['--force' => true], $output);
             $io->success('Database schema updated.');
         }
 
-        // 3. Initial Data
-        if ($io->confirm('Step 3: Enable initial countries and languages?', true)) {
+        // 4. Initial Data
+        if ($io->confirm('Step 4: Enable initial countries and languages?', true)) {
             $this->setupInitialData($io);
         }
 
-        // 4. Run First Sync
-        if ($io->confirm('Step 4: Run initial synchronization now? (This may take a while)', false)) {
+        // 5. Run First Sync
+        if ($io->confirm('Step 5: Run initial synchronization now? (This may take a while)', false)) {
             $this->runCommand('pallari:geoname:import-admin-codes', [], $output);
             $this->runCommand('pallari:geoname:sync', [], $output);
         }
 
         $io->success('Installation completed successfully!');
         return Command::SUCCESS;
+    }
+
+    private function generateConfig(SymfonyStyle $io): void
+    {
+        $fs = new Filesystem();
+        $configFile = $this->projectDir . '/config/packages/pallari_geoname.yaml';
+
+        if ($fs->exists($configFile)) {
+            $io->note('Configuration file already exists, skipping.');
+            return;
+        }
+
+        $useFulltext = $io->confirm('Enable Full-Text search? (Requires MySQL/PostgreSQL)', false);
+
+        $content = <<<YAML
+pallari_geoname:
+    # Entities mapping (default names)
+    entities:
+        geoname: 'App\Entity\GeoName'
+        country: 'App\Entity\GeoCountry'
+        language: 'App\Entity\GeoLanguage'
+        import: 'App\Entity\GeoImport'
+        admin1: 'App\Entity\GeoAdmin1'
+        admin2: 'App\Entity\GeoAdmin2'
+        admin3: 'App\Entity\GeoAdmin3'
+        admin4: 'App\Entity\GeoAdmin4'
+        alternate_name: 'App\Entity\GeoAlternateName'
+        hierarchy: 'App\Entity\GeoHierarchy'
+
+    # Performance options
+    search:
+        use_fulltext: {$(($useFulltext ? 'true' : 'false'))}
+
+    # Optional features
+    alternate_names:
+        enabled: true
+    admin5:
+        enabled: false
+YAML;
+        // Fix for heredoc variable interpolation
+        $content = str_replace('{$(($useFulltext ? \'true\' : \'false\'))}', $useFulltext ? 'true' : 'false', $content);
+
+        $fs->dumpFile($configFile, $content);
+        $io->writeln(' <info>✔</info> Created config/packages/pallari_geoname.yaml');
     }
 
     private function generateEntities(SymfonyStyle $io): void
