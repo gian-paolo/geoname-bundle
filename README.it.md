@@ -1,6 +1,6 @@
 # GeonameBundle
 
-[![Symfony](https://img.shields.io/badge/Symfony-%5E6.4%20%7C%20%5E7.0-000000?style=flat-square&logo=symfony)](https://symfony.com)
+[![Symfony](https://img.shields.io/badge/Symfony-%5E6.4%20%7C%20%5E7.0%20%7C%20%5E8.0-000000?style=flat-square&logo=symfony)](https://symfony.com)
 [![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-777bb4?style=flat-square&logo=php)](https://php.net)
 [![Version](https://img.shields.io/badge/version-0.2.0-orange?style=flat-square)](https://github.com/gian-paolo/geoname-bundle)
 
