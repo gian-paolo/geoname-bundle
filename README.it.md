@@ -109,7 +109,7 @@ public function miaRicerca(GeonameSearchService $searchService)
     ]);
     
     // I risultati includono: geonameid, name, latitude, longitude, 
-    // population, admin1_name, admin2_name
+    // population, admin1_name, admin1_id, admin2_name, admin2_id
 }
 ```
 

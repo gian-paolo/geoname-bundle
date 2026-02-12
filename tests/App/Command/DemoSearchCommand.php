@@ -51,8 +51,8 @@ class DemoSearchCommand extends Command
                 ['ASCII Name' => $res['ascii_name']],
                 ['Coordinates' => sprintf('%f, %f', $res['latitude'], $res['longitude'])],
                 ['Population' => $res['population'] ?? 'N/A'],
-                ['Region (Admin1)' => $res['admin1_name'] ?? 'N/A'],
-                ['Province (Admin2)' => $res['admin2_name'] ?? 'N/A'],
+                ['Region (Admin1)' => sprintf('%s (ID: %s)', $res['admin1_name'] ?? 'N/A', $res['admin1_id'] ?? 'N/A')],
+                ['Province (Admin2)' => sprintf('%s (ID: %s)', $res['admin2_name'] ?? 'N/A', $res['admin2_id'] ?? 'N/A')],
                 ['Feature Code' => $res['feature_code']]
             );
         }

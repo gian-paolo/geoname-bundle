@@ -55,7 +55,7 @@ class GeonameSearchService
 
         // Optional: Join Admin Names
         if ($options['with_admin_names'] ?? false) {
-            $qb->addSelect('a1.name as admin1_name', 'a2.name as admin2_name');
+            $qb->addSelect('a1.name as admin1_name', 'a1.geonameid as admin1_id', 'a2.name as admin2_name', 'a2.geonameid as admin2_id');
             
             // Join Admin1 (Region) - Key format is CC.ADM1
             $qb->leftJoin('g', $this->admin1Table, 'a1', 'a1.code = CONCAT(g.country_code, '.', g.admin1_code)');
