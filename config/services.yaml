@@ -41,6 +41,11 @@ services:
             $alternateNamesEnabled: '%pallari_geoname.alternate_names.enabled%'
             $admin5Enabled: '%pallari_geoname.admin5.enabled%'
             $geonameTable: '%pallari_geoname.tables.geoname%'
+            $adminTables:
+                adm1: '%pallari_geoname.tables.admin1%'
+                adm2: '%pallari_geoname.tables.admin2%'
+                adm3: '%pallari_geoname.tables.admin3%'
+                adm4: '%pallari_geoname.tables.admin4%'
         tags: ['console.command']
 
     Pallari\GeonameBundle\Command\ImportAdminCodesCommand:

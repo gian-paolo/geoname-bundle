@@ -14,6 +14,7 @@ class GeonameImporter
     private string $importEntityClass;
     private string $alternateNameEntityClass;
     private string $importTableName;
+    private array $adminTableNames = [];
     /** @var GeonameRepository */
     private $repository;
     /** @var GeonameRepository */
@@ -36,6 +37,11 @@ class GeonameImporter
             $this->alternateNameEntityClass = $alternateNameEntityClass;
             $this->alternateNameRepository = $this->em->getRepository($this->alternateNameEntityClass);
         }
+    }
+
+    public function setAdminTableNames(array $tables): void
+    {
+        $this->adminTableNames = $tables;
     }
 
     public function setTableNames(string $importTableName): void
@@ -312,7 +318,57 @@ class GeonameImporter
         if (!empty($toInsert)) $count += $this->repository->bulkInsert($toInsert);
         if (!empty($toUpdate)) $count += $this->repository->bulkUpdate($toUpdate, 'id');
 
+        $this->syncAdminTablesFromBatch($toProcess);
+
         return $count;
+    }
+
+    private function syncAdminTablesFromBatch(array $batch): void
+    {
+        if (empty($this->adminTableNames)) return;
+
+        $conn = $this->em->getConnection();
+        $adminData = [
+            'ADM1' => [],
+            'ADM2' => [],
+            'ADM3' => [],
+            'ADM4' => [],
+        ];
+
+        foreach ($batch as $data) {
+            $fCode = $data['featureCode'];
+            if (!isset($adminData[$fCode])) continue;
+
+            $code = $data['countryCode'];
+            if ($fCode === 'ADM1') {
+                $code .= '.' . $data['admin1Code'];
+            } elseif ($fCode === 'ADM2') {
+                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'];
+            } elseif ($fCode === 'ADM3') {
+                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'];
+            } elseif ($fCode === 'ADM4') {
+                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'] . '.' . $data['admin4Code'];
+            }
+
+            $adminData[$fCode][] = [
+                'code' => $code,
+                'name' => $data['name'],
+                'asciiname' => $data['asciiname'],
+                'geonameid' => $data['id']
+            ];
+        }
+
+        foreach ($adminData as $level => $rows) {
+            $tableName = $this->adminTableNames[strtolower($level)] ?? null;
+            if (!$tableName || empty($rows)) continue;
+
+            foreach ($rows as $row) {
+                $sql = "INSERT INTO `{$tableName}` (code, name, asciiname, geonameid) 
+                        VALUES (?, ?, ?, ?) 
+                        ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)";
+                $conn->executeStatement($sql, array_values($row));
+            }
+        }
     }
 
     private function processDeleteBatch(array $batch): int
