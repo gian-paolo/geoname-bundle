@@ -10,10 +10,13 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./test/docker-data/mariadb:/var/lib/mysql
+      - mariadb_data:/var/lib/mysql
 
   adminer:
     image: adminer
     container_name: geoname_adminer
     ports:
       - "8081:8080"
+
+volumes:
+  mariadb_data:
