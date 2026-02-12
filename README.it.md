@@ -20,6 +20,14 @@ A differenza di altri bundle, questo è progettato per gestire **milioni di reco
 
 ---
 
+## 🏗 Compatibilità Database
+
+Questo bundle è progettato per essere agnostico rispetto al database. Evita sintassi SQL proprietarie (come `UPSERT` o `ON CONFLICT`) e utilizza SQL-92 standard tramite Doctrine DBAL.
+
+Sia che tu usi **MySQL**, **MariaDB** o **PostgreSQL**, otterrai le stesse prestazioni elevate e la stessa integrità dei dati.
+
+---
+
 ## 🛠 Installazione
 
 ```bash

@@ -22,6 +22,14 @@ Unlike other bundles, it is designed to handle **millions of records** with mini
 
 ---
 
+## 🏗 Database Compatibility
+
+This bundle is designed to be database-agnostic. It avoids proprietary SQL syntax (like `UPSERT` or `ON CONFLICT`) and uses standard SQL-92 via Doctrine DBAL. 
+
+Whether you are using **MySQL**, **MariaDB**, or **PostgreSQL**, you will get the same high performance and data integrity.
+
+---
+
 ## 🛠 Installation
 
 ```bash
