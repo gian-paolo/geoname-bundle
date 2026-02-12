@@ -106,7 +106,7 @@ pallari_geoname:
 
     # Performance options
     search:
-        use_fulltext: {$fulltextString}
+        use_fulltext: $fulltextString
 
     # Optional features
     alternate_names:
