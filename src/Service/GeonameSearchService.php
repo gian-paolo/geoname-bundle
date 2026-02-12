@@ -38,7 +38,7 @@ class GeonameSearchService
         $platform = $this->connection->getDatabasePlatform()->getName();
         
         // Base selection
-        $qb->select('g.geonameid', 'g.name', 'g.ascii_name', 'g.country_code', 'g.latitude', 'g.longitude', 'g.population', 'g.feature_code');
+        $qb->select('g.geonameid', 'g.name', 'g.ascii_name', 'g.country_code', 'g.latitude', 'g.longitude', 'g.population', 'g.feature_code', 'g.admin5_code');
         $qb->from($this->geonameTable, 'g');
         $qb->where('g.is_deleted = 0');
 

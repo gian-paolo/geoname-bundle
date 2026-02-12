@@ -48,6 +48,9 @@ abstract class AbstractGeoName
     #[ORM\Column(name: 'admin4_code', length: 20, nullable: true)]
     protected ?string $admin4Code = null;
 
+    #[ORM\Column(name: 'admin5_code', length: 20, nullable: true)]
+    protected ?string $admin5Code = null;
+
     #[ORM\Column(type: Types::BIGINT, nullable: true)]
     protected ?string $population = null;
 

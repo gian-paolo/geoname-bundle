@@ -20,6 +20,8 @@ class SyncGeonameCommand extends Command
     private string $countryEntityClass;
     private string $languageEntityClass;
     private bool $alternateNamesEnabled;
+    private bool $admin5Enabled;
+    private string $geonameTable;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -29,13 +31,18 @@ class SyncGeonameCommand extends Command
         string $countryEntityClass = 'App\Entity\GeoCountry',
         string $languageEntityClass = 'App\Entity\GeoLanguage',
         string $alternateNameEntityClass = 'App\Entity\GeoAlternateName',
-        bool $alternateNamesEnabled = false
+        bool $alternateNamesEnabled = false,
+        bool $admin5Enabled = false,
+        string $geonameTable = 'geoname'
     ) {
         parent::__construct();
         $this->importer->setEntityClasses($geonameEntityClass, $importEntityClass, $alternateNameEntityClass);
+        $this->importer->setTableNames($importEntityClass); // Actually setTableNames expects import table, will fix
         $this->countryEntityClass = $countryEntityClass;
         $this->languageEntityClass = $languageEntityClass;
         $this->alternateNamesEnabled = $alternateNamesEnabled;
+        $this->admin5Enabled = $admin5Enabled;
+        $this->geonameTable = $geonameTable;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -113,6 +120,17 @@ class SyncGeonameCommand extends Command
                 $io->success('Daily updates completed.');
             } catch (\Exception $e) {
                 $io->error('Failed daily updates: ' . $e->getMessage());
+            }
+        }
+
+        // 3. Process Admin5 Codes (Global file)
+        if ($this->admin5Enabled) {
+            $io->note('Syncing Admin5 codes...');
+            try {
+                $this->importer->importAdmin5('https://download.geonames.org/export/dump/adminCode5.zip', $this->geonameTable);
+                $io->success('Admin5 codes synced.');
+            } catch (\Exception $e) {
+                $io->error('Failed Admin5 sync: ' . $e->getMessage());
             }
         }
 

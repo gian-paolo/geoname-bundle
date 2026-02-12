@@ -59,6 +59,10 @@ pallari_geoname:
     # Performance: Abilita la ricerca Full-Text
     search:
         use_fulltext: true
+
+    # Opzionale: Abilita importazione codici Admin5 (file globale separato)
+    admin5:
+        enabled: true
 ```
 
 ### Setup delle Entità

@@ -213,6 +213,38 @@ class GeonameImporter
         return $total;
     }
 
+    public function importAdmin5(string $url, string $tableName): int
+    {
+        $filePath = $this->downloadFile($url);
+        if (str_ends_with($url, '.zip')) {
+            $filePath = $this->unzip($filePath);
+        }
+
+        $total = 0;
+        $conn = $this->em->getConnection();
+
+        foreach ($this->parser->getBatches($filePath, 2000) as $batch) {
+            $sql = "UPDATE `{$tableName}` SET admin5_code = CASE geonameid ";
+            $ids = [];
+            foreach ($batch as $row) {
+                if (count($row) < 2) continue;
+                $id = (int)$row[0];
+                $code = $row[1];
+                $sql .= "WHEN {$id} THEN " . $conn->quote($code) . " ";
+                $ids[] = $id;
+                $total++;
+            }
+            $sql .= "END WHERE geonameid IN (" . implode(',', $ids) . ")";
+            
+            if (!empty($ids)) {
+                $conn->executeStatement($sql);
+            }
+        }
+
+        if (file_exists($filePath)) unlink($filePath);
+        return $total;
+    }
+
     private function importIncremental(string $url, string $type, array $allowedCountries = [], bool $isDelete = false, bool $isAlternate = false): void
     {
         $importLog = $this->createImportLog($type, $url);

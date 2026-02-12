@@ -61,6 +61,10 @@ pallari_geoname:
     # Performance: Enable Full-Text Search
     search:
         use_fulltext: true
+
+    # Optional: Enable Admin5 codes import (separate global file)
+    admin5:
+        enabled: true
 ```
 
 ### Entity Setup

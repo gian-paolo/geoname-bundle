@@ -27,6 +27,7 @@ class PallariGeonameExtension extends Extension
         // Other config
         $container->setParameter('pallari_geoname.temp_dir', $config['temp_dir']);
         $container->setParameter('pallari_geoname.alternate_names.enabled', $config['alternate_names']['enabled']);
+        $container->setParameter('pallari_geoname.admin5.enabled', $config['admin5']['enabled']);
         $container->setParameter('pallari_geoname.search.use_fulltext', $config['search']['use_fulltext']);
 
         $loader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));

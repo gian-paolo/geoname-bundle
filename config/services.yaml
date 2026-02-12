@@ -39,6 +39,8 @@ services:
             $languageEntityClass: '%pallari_geoname.entities.language%'
             $alternateNameEntityClass: '%pallari_geoname.entities.alternate_name%'
             $alternateNamesEnabled: '%pallari_geoname.alternate_names.enabled%'
+            $admin5Enabled: '%pallari_geoname.admin5.enabled%'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
         tags: ['console.command']
 
     Pallari\GeonameBundle\Command\ImportAdminCodesCommand:
