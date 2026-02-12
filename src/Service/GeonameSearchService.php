@@ -27,6 +27,11 @@ class GeonameSearchService
      */
     public function search(string $term, array $options = []): array
     {
+        $term = trim($term);
+        if (strlen($term) < 2) {
+            return [];
+        }
+
         $qb = $this->connection->createQueryBuilder();
         $platform = $this->connection->getDatabasePlatform()->getName();
         
@@ -84,7 +89,11 @@ class GeonameSearchService
         $qb->orderBy('g.population', 'DESC');
         $qb->addOrderBy('g.name', 'ASC');
 
-        $qb->setMaxResults($options['limit'] ?? 10);
+        // Safety limit: clamp requested limit between 1 and 500
+        $limit = isset($options['limit']) ? (int)$options['limit'] : 10;
+        $limit = max(1, min(500, $limit));
+        
+        $qb->setMaxResults($limit);
 
         return $qb->executeQuery()->fetchAllAssociative();
     }
