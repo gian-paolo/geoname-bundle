@@ -28,7 +28,7 @@ class GeonameSearchService
     public function search(string $term, array $options = []): array
     {
         $term = trim($term);
-        if (strlen($term) < 2) {
+        if (strlen($term) < 3) {
             return [];
         }
 
