@@ -83,6 +83,28 @@ php bin/console gpp:geoname:sync
 
 ---
 
+## 🔍 Searching for Data
+
+The bundle provides a high-performance `GeonameSearchService` to find cities and places with their administrative context (regions, provinces).
+
+```php
+use Gpp\GeonameBundle\Service\GeonameSearchService;
+
+public function mySearch(GeonameSearchService $searchService)
+{
+    $results = $searchService->search('Torino', [
+        'countries' => ['IT'],
+        'with_admin_names' => true, // Joins region/province names
+        'limit' => 5
+    ]);
+    
+    // Results include: geonameid, name, latitude, longitude, 
+    // population, admin1_name, admin2_name
+}
+```
+
+---
+
 ## ⚙️ Technical Details
 
 ### "Hybrid" Update Strategy

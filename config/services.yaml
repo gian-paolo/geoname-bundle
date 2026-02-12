@@ -5,6 +5,13 @@ services:
 
     Gpp\GeonameBundle\Service\GeonameParser: ~
 
+    Gpp\GeonameBundle\Service\GeonameSearchService:
+        arguments:
+            $connection: '@database_connection'
+            $geonameTable: '%gpp_geoname.tables.geoname%'
+            $admin1Table: '%gpp_geoname.tables.admin1%'
+            $admin2Table: '%gpp_geoname.tables.admin2%'
+
     Gpp\GeonameBundle\Service\GeonameHierarchyService:
         arguments:
             $connection: '@database_connection'
