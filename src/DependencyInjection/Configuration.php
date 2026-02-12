@@ -19,7 +19,7 @@ class Configuration implements ConfigurationInterface
                     ->children()
                         ->scalarNode('geoname')->defaultValue('App\Entity\GeoName')->end()
                         ->scalarNode('country')->defaultValue('App\Entity\GeoCountry')->end()
-                        ->scalarNode('import')->defaultValue('App\Entity\DataImport')->end()
+                        ->scalarNode('import')->defaultValue('App\Entity\GeoImport')->end()
                         ->scalarNode('admin1')->defaultValue('App\Entity\GeoAdmin1')->end()
                         ->scalarNode('admin2')->defaultValue('App\Entity\GeoAdmin2')->end()
                         ->scalarNode('admin3')->defaultValue('App\Entity\GeoAdmin3')->end()

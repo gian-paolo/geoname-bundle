@@ -3,7 +3,7 @@
 namespace Pallari\GeonameBundle\Tests\App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Pallari\GeonameBundle\Entity\AbstractDataImport;
+use Pallari\GeonameBundle\Entity\AbstractGeoImport;
 
 #[ORM\Entity]
-class DataImport extends AbstractDataImport {}
+class GeoImport extends AbstractGeoImport {}

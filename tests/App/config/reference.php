@@ -923,7 +923,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     entities?: array{
  *         geoname?: scalar|Param|null, // Default: "App\\Entity\\GeoName"
  *         country?: scalar|Param|null, // Default: "App\\Entity\\GeoCountry"
- *         import?: scalar|Param|null, // Default: "App\\Entity\\DataImport"
+ *         import?: scalar|Param|null, // Default: "App\\Entity\\GeoImport"
  *         admin1?: scalar|Param|null, // Default: "App\\Entity\\GeoAdmin1"
  *         admin2?: scalar|Param|null, // Default: "App\\Entity\\GeoAdmin2"
  *         alternate_name?: scalar|Param|null, // Default: "App\\Entity\\GeoAlternateName"

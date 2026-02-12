@@ -3,7 +3,7 @@
 namespace Pallari\GeonameBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Pallari\GeonameBundle\Entity\AbstractDataImport;
+use Pallari\GeonameBundle\Entity\AbstractGeoImport;
 use Pallari\GeonameBundle\Entity\AbstractGeoName;
 use Pallari\GeonameBundle\Repository\GeonameRepository;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -442,18 +442,18 @@ class GeonameImporter
         ];
     }
 
-    private function createImportLog(string $type, string $url): AbstractDataImport
+    private function createImportLog(string $type, string $url): AbstractGeoImport
     {
         $log = new $this->importEntityClass();
         $log->setType($type);
-        $log->setStatus(AbstractDataImport::STATUS_RUNNING);
+        $log->setStatus(AbstractGeoImport::STATUS_RUNNING);
         $log->setDetails("Source: $url");
         $this->em->persist($log);
         $this->em->flush();
         return $log;
     }
 
-    private function updateImportLog(AbstractDataImport $log, int $count): void
+    private function updateImportLog(AbstractGeoImport $log, int $count): void
     {
         $this->em->getConnection()->executeStatement(
             sprintf("UPDATE `%s` SET records_processed = ? WHERE id = ?", $this->importTableName),
@@ -461,20 +461,20 @@ class GeonameImporter
         );
     }
 
-    private function completeImportLog(AbstractDataImport $log, int $count): void
+    private function completeImportLog(AbstractGeoImport $log, int $count): void
     {
         $this->em->getConnection()->executeStatement(
             sprintf("UPDATE `%s` SET status = ?, records_processed = ?, ended_at = ? WHERE id = ?", $this->importTableName),
-            [AbstractDataImport::STATUS_COMPLETED, $count, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
+            [AbstractGeoImport::STATUS_COMPLETED, $count, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
         );
     }
 
-    private function failImportLog(AbstractDataImport $log, string $error): void
+    private function failImportLog(AbstractGeoImport $log, string $error): void
     {
         if (!$this->em->isOpen()) return;
         $this->em->getConnection()->executeStatement(
             sprintf("UPDATE `%s` SET status = ?, error_message = ?, ended_at = ? WHERE id = ?", $this->importTableName),
-            [AbstractDataImport::STATUS_FAILED, $error, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
+            [AbstractGeoImport::STATUS_FAILED, $error, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
         );
     }
 

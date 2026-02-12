@@ -27,7 +27,7 @@ class SyncGeonameCommand extends Command
         private EntityManagerInterface $em,
         private GeonameImporter $importer,
         string $geonameEntityClass = 'App\Entity\GeoName',
-        string $importEntityClass = 'App\Entity\DataImport',
+        string $importEntityClass = 'App\Entity\GeoImport',
         string $countryEntityClass = 'App\Entity\GeoCountry',
         string $languageEntityClass = 'App\Entity\GeoLanguage',
         string $alternateNameEntityClass = 'App\Entity\GeoAlternateName',

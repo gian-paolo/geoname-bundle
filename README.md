@@ -50,7 +50,7 @@ pallari_geoname:
         geoname: 'App\Entity\GeoName'      # Your entity for cities
         country: 'App\Entity\GeoCountry'    # Enabled countries status
         language: 'App\Entity\GeoLanguage'  # Enabled languages for search
-        import: 'App\Entity\DataImport'     # Import logs
+        import: 'App\Entity\GeoImport'     # Import logs
         admin1: 'App\Entity\GeoAdmin1'      # Region names
         admin2: 'App\Entity\GeoAdmin2'      # Province names
         admin3: 'App\Entity\GeoAdmin3'      # Municipality names (e.g. Comuni)
@@ -85,7 +85,7 @@ Create these files in `src/Entity/`. Each class must extend the corresponding ab
 | `GeoName.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoName` |
 | `GeoCountry.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoCountry` |
 | `GeoLanguage.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoLanguage` |
-| `DataImport.php` | `\Pallari\GeonameBundle\Entity\AbstractDataImport` |
+| `GeoImport.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoImport` |
 | `GeoAdmin1.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin1` |
 | `GeoAdmin2.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin2` |
 | `GeoAdmin3.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin3` |

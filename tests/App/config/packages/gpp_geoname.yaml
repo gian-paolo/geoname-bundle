@@ -2,7 +2,7 @@ pallari_geoname:
     entities:
         geoname: 'Pallari\GeonameBundle\Tests\App\Entity\GeoName'
         country: 'Pallari\GeonameBundle\Tests\App\Entity\GeoCountry'
-        import: 'Pallari\GeonameBundle\Tests\App\Entity\DataImport'
+        import: 'Pallari\GeonameBundle\Tests\App\Entity\GeoImport'
         admin1: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAdmin1'
         admin2: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAdmin2'
         alternate_name: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAlternateName'
