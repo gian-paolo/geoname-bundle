@@ -2,3 +2,6 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+
+    Pallari\GeonameBundle\Tests\App\Command\DemoSearchCommand:
+        tags: ['console.command']

@@ -16,7 +16,7 @@ class Kernel extends BaseKernel
         return [
             new \Symfony\Bundle\FrameworkBundle\FrameworkBundle(),
             new \Doctrine\Bundle\DoctrineBundle\DoctrineBundle(),
-            new \Gpp\GeonameBundle\PallariGeonameBundle(),
+            new \Pallari\GeonameBundle\PallariGeonameBundle(),
         ];
     }
 
