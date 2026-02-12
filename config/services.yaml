@@ -26,6 +26,9 @@ services:
             $geonameEntityClass: '%gpp_geoname.entities.geoname%'
             $importEntityClass: '%gpp_geoname.entities.import%'
             $countryEntityClass: '%gpp_geoname.entities.country%'
+            $languageEntityClass: '%gpp_geoname.entities.language%'
+            $alternateNameEntityClass: '%gpp_geoname.entities.alternate_name%'
+            $alternateNamesEnabled: '%gpp_geoname.alternate_names.enabled%'
         tags: ['console.command']
 
     Gpp\GeonameBundle\Command\ImportAdminCodesCommand:

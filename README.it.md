@@ -37,18 +37,18 @@ gpp_geoname:
     entities:
         geoname: 'App\Entity\GeoName'      # La tua entità per le città
         country: 'App\Entity\GeoCountry'    # Stato dei paesi abilitati
+        language: 'App\Entity\GeoLanguage'  # Lingue abilitate per la ricerca
         import: 'App\Entity\DataImport'     # Log delle importazioni
         admin1: 'App\Entity\GeoAdmin1'      # Nomi Regioni
         admin2: 'App\Entity\GeoAdmin2'      # Nomi Province
     
-    # Se vuoi importare le traduzioni dei nomi
+    # Abilita la sincronizzazione dei nomi alternativi
     alternate_names:
         enabled: true
-        languages: ['it', 'en', 'fr']
 ```
 
 ### Setup delle Entità
-Per mantenere il bundle leggero e flessibile, devi creare le tue entità che estendono quelle del bundle. Esempio per la città:
+Il bundle elabora solo i paesi e le lingue che sono **abilitati** nel database (imposta `is_enabled = 1` nelle tue tabelle `geocountry` e `geolanguage`). Questo ti permette di supportare nuove lingue di ricerca senza dover modificare il codice.
 
 ```php
 // src/Entity/GeoName.php
@@ -74,7 +74,9 @@ php bin/console gpp:geoname:import-admin-codes
 ```
 
 ### 2. Sincronizza i dati (Import & Daily Sync)
-Questo è il comando che userai più spesso. La prima volta scaricherà i dati completi, poi scaricherà solo gli aggiornamenti del giorno precedente:
+Questo è il comando che userai più spesso. Il bundle elabora solo i paesi che sono **abilitati** nel database (imposta `is_enabled = 1` nella tua tabella `geocountry`).
+
+La prima volta scaricherà i dati completi, poi scaricherà solo gli aggiornamenti del giorno precedente:
 ```bash
 php bin/console gpp:geoname:sync
 ```

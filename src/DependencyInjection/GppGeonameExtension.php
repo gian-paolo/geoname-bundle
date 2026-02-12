@@ -27,7 +27,6 @@ class GppGeonameExtension extends Extension
         // Other config
         $container->setParameter('gpp_geoname.temp_dir', $config['temp_dir']);
         $container->setParameter('gpp_geoname.alternate_names.enabled', $config['alternate_names']['enabled']);
-        $container->setParameter('gpp_geoname.alternate_names.languages', $config['alternate_names']['languages']);
 
         $loader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.yaml');

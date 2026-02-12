@@ -18,18 +18,24 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class SyncGeonameCommand extends Command
 {
     private string $countryEntityClass;
+    private string $languageEntityClass;
+    private bool $alternateNamesEnabled;
 
     public function __construct(
         private EntityManagerInterface $em,
         private GeonameImporter $importer,
-        // These would be injected via configuration in a real bundle
         string $geonameEntityClass = 'App\Entity\GeoName',
         string $importEntityClass = 'App\Entity\DataImport',
-        string $countryEntityClass = 'App\Entity\GeoCountry'
+        string $countryEntityClass = 'App\Entity\GeoCountry',
+        string $languageEntityClass = 'App\Entity\GeoLanguage',
+        string $alternateNameEntityClass = 'App\Entity\GeoAlternateName',
+        bool $alternateNamesEnabled = false
     ) {
         parent::__construct();
-        $this->importer->setEntityClasses($geonameEntityClass, $importEntityClass);
+        $this->importer->setEntityClasses($geonameEntityClass, $importEntityClass, $alternateNameEntityClass);
         $this->countryEntityClass = $countryEntityClass;
+        $this->languageEntityClass = $languageEntityClass;
+        $this->alternateNamesEnabled = $alternateNamesEnabled;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -42,6 +48,19 @@ class SyncGeonameCommand extends Command
         if (empty($countries)) {
             $io->warning('No enabled countries found.');
             return Command::SUCCESS;
+        }
+
+        // Get enabled languages from DB if alternate names are enabled
+        $allowedLanguages = [];
+        if ($this->alternateNamesEnabled) {
+            $languages = $this->em->getRepository($this->languageEntityClass)->findBy(['isEnabled' => true]);
+            $allowedLanguages = array_map(fn($l) => $l->getCode(), $languages);
+            
+            if (empty($allowedLanguages)) {
+                $io->note('Alternate names enabled but no languages enabled in DB. Alternate names will be skipped.');
+            } else {
+                $io->note(sprintf('Alternate names will be synced for languages: %s', implode(', ', $allowedLanguages)));
+            }
         }
 
         $yesterday = new \DateTime('yesterday');
@@ -66,6 +85,10 @@ class SyncGeonameCommand extends Command
                 $url = sprintf('https://download.geonames.org/export/dump/%s.zip', strtoupper($country->getCode()));
                 $this->importer->importFull($url, [$country->getCode()]);
                 
+                // If alternate names are enabled, we might need a full import for alternate names too
+                // For simplicity, we assume if we do a full country import, we might want to refresh alternate names
+                // though usually they are in a single global file.
+                
                 $country->setLastImportedAt(new \DateTime());
                 $this->em->flush();
                 $io->success(sprintf('Full import for %s completed.', $country->getCode()));
@@ -78,7 +101,7 @@ class SyncGeonameCommand extends Command
         if (!empty($needsDaily)) {
             $io->note(sprintf('Syncing daily updates for: %s', implode(', ', $needsDaily)));
             try {
-                $this->importer->importDailyUpdates($yesterday, $needsDaily);
+                $this->importer->importDailyUpdates($yesterday, $needsDaily, !empty($allowedLanguages));
                 
                 foreach ($needsDaily as $code) {
                     $country = $this->em->getRepository($this->countryEntityClass)->find($code);
