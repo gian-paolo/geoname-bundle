@@ -55,6 +55,7 @@ class GeonameImporter
 
     public function importFull(string $url, ?array $allowedCountries = null): void
     {
+        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
         $importLog = $this->createImportLog('full_import', $url);
         
         try {
@@ -79,6 +80,7 @@ class GeonameImporter
 
     public function importHierarchy(string $url): int
     {
+        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
         $filePath = $this->downloadFile($url);
         if (str_ends_with($url, '.zip')) {
             $filePath = $this->unzip($filePath);
@@ -200,6 +202,7 @@ class GeonameImporter
 
     public function importAdminCodes(string $url, string $entityClass): int
     {
+        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
         $filePath = $this->downloadFile($url);
         $total = 0;
         $conn = $this->em->getConnection();
@@ -246,6 +249,7 @@ class GeonameImporter
 
     public function importAdmin5(string $url, string $tableName): int
     {
+        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
         $filePath = $this->downloadFile($url);
         if (str_ends_with($url, '.zip')) {
             $filePath = $this->unzip($filePath);
