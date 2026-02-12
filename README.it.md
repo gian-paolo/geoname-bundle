@@ -13,6 +13,7 @@ A differenza di altri bundle, questo è progettato per gestire **milioni di reco
 
 ## 🚀 Caratteristiche Principali
 
+- **Installatore Interattivo**: Configurazione completa in pochi secondi con `pallari:geoname:install`.
 - **Sincronizzazione Intelligente**: Scarica e applica solo le modifiche e le eliminazioni giornaliere di GeoNames.
 - **Performance SQL Bulk**: Utilizza query SQL ottimizzate (`bulkInsert` e `bulkUpdate`) riducendo il numero di query del 99%.
 - **Strategia Ibrida**: Divide automaticamente i dati tra "nuovi" e "esistenti" per una gestione trasparente e sicura.

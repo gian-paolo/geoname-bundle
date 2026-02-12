@@ -15,6 +15,7 @@ Unlike other bundles, it is designed to handle **millions of records** with mini
 
 ## 🚀 Key Features
 
+- **Interactive Installer**: Complete setup in seconds with `pallari:geoname:install`.
 - **Smart Synchronization**: Downloads and applies only daily changes and deletions from GeoNames.
 - **Bulk SQL Performance**: Uses optimized SQL queries (`bulkInsert` and `bulkUpdate`), reducing the number of queries by 99%.
 - **Hybrid Strategy**: Automatically splits data between "new" and "existing" for transparent and safe management.
