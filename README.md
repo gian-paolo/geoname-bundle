@@ -185,7 +185,7 @@ If `search.use_fulltext` is enabled, the bundle automatically uses:
 
 This bundle is an independent, open-source project and is **not affiliated, associated, authorized, endorsed by, or in any way officially connected** with [GeoNames.org](https://www.geonames.org/). 
 
-The data provided by the synchronization commands is owned and maintained by GeoNames. Please respect their [Terms and Conditions](https://www.geonames.org/export/credits.html) and consider supporting them if you find their data useful.
+The data provided by the synchronization commands is owned and maintained by GeoNames. It is typically released under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Please respect their [Terms and Conditions](https://www.geonames.org/about.html) and consider supporting them if you find their data useful.
 
 ---
 

@@ -205,7 +205,7 @@ WHERE c.name LIKE 'Torino%' AND c.is_deleted = 0;
 
 Questo bundle è un progetto open-source indipendente e **non è affiliato, associato, autorizzato, approvato o in alcun modo ufficialmente collegato** con [GeoNames.org](https://www.geonames.org/).
 
-I dati forniti dai comandi di sincronizzazione appartengono e sono gestiti da GeoNames. Si prega di rispettare i loro [Termini e Condizioni](https://www.geonames.org/export/credits.html) e di considerare l'idea di sostenerli se trovate i loro dati utili.
+I dati forniti dai comandi di sincronizzazione appartengono e sono gestiti da GeoNames. Sono solitamente rilasciati sotto la licenza [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Si prega di rispettare i loro [Termini e Condizioni](https://www.geonames.org/about.html) e di considerare l'idea di sostenerli se trovate i loro dati utili.
 
 ---
 
