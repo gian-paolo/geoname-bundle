@@ -1,8 +1,8 @@
 <?php
 
-namespace Gpp\GeonameBundle\Command;
+namespace Pallari\GeonameBundle\Command;
 
-use Gpp\GeonameBundle\Service\GeonameImporter;
+use Pallari\GeonameBundle\Service\GeonameImporter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -10,7 +10,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
-    name: 'gpp:geoname:import-admin-codes',
+    name: 'pallari:geoname:import-admin-codes',
     description: 'Imports Admin1 and Admin2 codes (Region and Province names)',
 )]
 class ImportAdminCodesCommand extends Command

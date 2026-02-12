@@ -919,7 +919,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         resolve_target_entities?: array<string, scalar|Param|null>,
  *     },
  * }
- * @psalm-type GppGeonameConfig = array{
+ * @psalm-type PallariGeonameConfig = array{
  *     entities?: array{
  *         geoname?: scalar|Param|null, // Default: "App\\Entity\\GeoName"
  *         country?: scalar|Param|null, // Default: "App\\Entity\\GeoCountry"
@@ -950,7 +950,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     services?: ServicesConfig,
  *     framework?: FrameworkConfig,
  *     doctrine?: DoctrineConfig,
- *     gpp_geoname?: GppGeonameConfig,
+ *     pallari_geoname?: PallariGeonameConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,

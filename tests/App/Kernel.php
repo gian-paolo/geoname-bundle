@@ -1,6 +1,6 @@
 <?php
 
-namespace Gpp\GeonameBundle\Tests\App;
+namespace Pallari\GeonameBundle\Tests\App;
 
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
@@ -16,7 +16,7 @@ class Kernel extends BaseKernel
         return [
             new \Symfony\Bundle\FrameworkBundle\FrameworkBundle(),
             new \Doctrine\Bundle\DoctrineBundle\DoctrineBundle(),
-            new \Gpp\GeonameBundle\GppGeonameBundle(),
+            new \Gpp\GeonameBundle\PallariGeonameBundle(),
         ];
     }
 
@@ -27,12 +27,12 @@ class Kernel extends BaseKernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/GppGeonameBundle/cache/' . $this->environment;
+        return sys_get_temp_dir() . '/PallariGeonameBundle/cache/' . $this->environment;
     }
 
     public function getLogDir(): string
     {
-        return sys_get_temp_dir() . '/GppGeonameBundle/logs';
+        return sys_get_temp_dir() . '/PallariGeonameBundle/logs';
     }
 
     protected function configureContainer(ContainerConfigurator $container): void

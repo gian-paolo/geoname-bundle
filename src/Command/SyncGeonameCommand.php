@@ -1,10 +1,10 @@
 <?php
 
-namespace Gpp\GeonameBundle\Command;
+namespace Pallari\GeonameBundle\Command;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Gpp\GeonameBundle\Entity\AbstractGeoCountry;
-use Gpp\GeonameBundle\Service\GeonameImporter;
+use Pallari\GeonameBundle\Entity\AbstractGeoCountry;
+use Pallari\GeonameBundle\Service\GeonameImporter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
-    name: 'gpp:geoname:sync',
+    name: 'pallari:geoname:sync',
     description: 'Synchronizes GeoNames data (Incremental or Full)',
 )]
 class SyncGeonameCommand extends Command

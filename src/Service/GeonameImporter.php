@@ -1,11 +1,11 @@
 <?php
 
-namespace Gpp\GeonameBundle\Service;
+namespace Pallari\GeonameBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Gpp\GeonameBundle\Entity\AbstractDataImport;
-use Gpp\GeonameBundle\Entity\AbstractGeoName;
-use Gpp\GeonameBundle\Repository\GeonameRepository;
+use Pallari\GeonameBundle\Entity\AbstractDataImport;
+use Pallari\GeonameBundle\Entity\AbstractGeoName;
+use Pallari\GeonameBundle\Repository\GeonameRepository;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class GeonameImporter

@@ -40,10 +40,10 @@ composer require pallari/geoname-bundle
 
 ## 📝 Configuration
 
-GeoNames provides a vast amount of data. With this bundle, you decide what to keep in your database. Create the `config/packages/gpp_geoname.yaml` file:
+GeoNames provides a vast amount of data. With this bundle, you decide what to keep in your database. Create the `config/packages/pallari_geoname.yaml` file:
 
 ```yaml
-gpp_geoname:
+pallari_geoname:
     entities:
         geoname: 'App\Entity\GeoName'      # Your entity for cities
         country: 'App\Entity\GeoCountry'    # Enabled countries status
@@ -81,7 +81,7 @@ To keep the bundle lightweight, you need to create your own entities that extend
 ### 1. Import Administrative Codes
 Administrative codes (e.g., "IT.09") need their labels (e.g., "Piemonte"). Run this command once:
 ```bash
-php bin/console gpp:geoname:import-admin-codes
+php bin/console pallari:geoname:import-admin-codes
 ```
 
 ### 2. Synchronize Data (Import & Daily Sync)
@@ -89,7 +89,7 @@ This is the command you'll use most often. It only processes countries that are 
 
 The first time it will download full data, then it will only download updates from the previous day:
 ```bash
-php bin/console gpp:geoname:sync
+php bin/console pallari:geoname:sync
 ```
 *Tip: Add this command to your **Crontab** to run every morning at 06:00 UTC.*
 

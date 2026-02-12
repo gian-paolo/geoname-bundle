@@ -1,6 +1,6 @@
 <?php
 
-namespace Gpp\GeonameBundle\Repository;
+namespace Pallari\GeonameBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;

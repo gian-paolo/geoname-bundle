@@ -3,44 +3,44 @@ services:
         autowire: true
         autoconfigure: true
 
-    Gpp\GeonameBundle\Service\GeonameParser: ~
+    Pallari\GeonameBundle\Service\GeonameParser: ~
 
-    Gpp\GeonameBundle\Service\GeonameSearchService:
+    Pallari\GeonameBundle\Service\GeonameSearchService:
         arguments:
             $connection: '@database_connection'
-            $geonameTable: '%gpp_geoname.tables.geoname%'
-            $admin1Table: '%gpp_geoname.tables.admin1%'
-            $admin2Table: '%gpp_geoname.tables.admin2%'
-            $useFulltext: '%gpp_geoname.search.use_fulltext%'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
+            $admin1Table: '%pallari_geoname.tables.admin1%'
+            $admin2Table: '%pallari_geoname.tables.admin2%'
+            $useFulltext: '%pallari_geoname.search.use_fulltext%'
 
-    Gpp\GeonameBundle\Service\GeonameHierarchyService:
+    Pallari\GeonameBundle\Service\GeonameHierarchyService:
         arguments:
             $connection: '@database_connection'
-            $geonameTable: '%gpp_geoname.tables.geoname%'
-            $hierarchyTable: '%gpp_geoname.tables.hierarchy%'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
+            $hierarchyTable: '%pallari_geoname.tables.hierarchy%'
 
-    Gpp\GeonameBundle\Service\GeonameImporter:
+    Pallari\GeonameBundle\Service\GeonameImporter:
         arguments:
             $em: '@doctrine.orm.entity_manager'
             $httpClient: '@http_client'
-            $tmpDir: '%gpp_geoname.temp_dir%'
+            $tmpDir: '%pallari_geoname.temp_dir%'
         calls:
-            - [setEntityClasses, ['%gpp_geoname.entities.geoname%', '%gpp_geoname.entities.import%']]
-            - [setTableNames, ['%gpp_geoname.tables.import%']]
+            - [setEntityClasses, ['%pallari_geoname.entities.geoname%', '%pallari_geoname.entities.import%']]
+            - [setTableNames, ['%pallari_geoname.tables.import%']]
 
-    Gpp\GeonameBundle\Command\SyncGeonameCommand:
+    Pallari\GeonameBundle\Command\SyncGeonameCommand:
         arguments:
             $em: '@doctrine.orm.entity_manager'
-            $geonameEntityClass: '%gpp_geoname.entities.geoname%'
-            $importEntityClass: '%gpp_geoname.entities.import%'
-            $countryEntityClass: '%gpp_geoname.entities.country%'
-            $languageEntityClass: '%gpp_geoname.entities.language%'
-            $alternateNameEntityClass: '%gpp_geoname.entities.alternate_name%'
-            $alternateNamesEnabled: '%gpp_geoname.alternate_names.enabled%'
+            $geonameEntityClass: '%pallari_geoname.entities.geoname%'
+            $importEntityClass: '%pallari_geoname.entities.import%'
+            $countryEntityClass: '%pallari_geoname.entities.country%'
+            $languageEntityClass: '%pallari_geoname.entities.language%'
+            $alternateNameEntityClass: '%pallari_geoname.entities.alternate_name%'
+            $alternateNamesEnabled: '%pallari_geoname.alternate_names.enabled%'
         tags: ['console.command']
 
-    Gpp\GeonameBundle\Command\ImportAdminCodesCommand:
+    Pallari\GeonameBundle\Command\ImportAdminCodesCommand:
         arguments:
-            $admin1EntityClass: '%gpp_geoname.entities.admin1%'
-            $admin2EntityClass: '%gpp_geoname.entities.admin2%'
+            $admin1EntityClass: '%pallari_geoname.entities.admin1%'
+            $admin2EntityClass: '%pallari_geoname.entities.admin2%'
         tags: ['console.command']

@@ -1,4 +1,4 @@
-# Contributing to GppGeonameBundle
+# Contributing to PallariGeonameBundle
 
 First off, thank you for considering contributing to this bundle! 
 

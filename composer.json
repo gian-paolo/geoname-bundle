@@ -23,12 +23,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Gpp\\GeonameBundle\\": "src/"
+            "Pallari\\GeonameBundle\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Gpp\\GeonameBundle\\Tests\\": "tests/"
+            "Pallari\\GeonameBundle\\Tests\\": "tests/"
         }
     },
     "config": {

@@ -1,10 +1,10 @@
 <?php
 
-namespace Gpp\GeonameBundle;
+namespace Pallari\GeonameBundle;
 
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
-class GppGeonameBundle extends Bundle
+class PallariGeonameBundle extends Bundle
 {
     public function getPath(): string
     {

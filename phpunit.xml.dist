@@ -4,7 +4,7 @@
          bootstrap="vendor/autoload.php"
          colors="true">
     <testsuites>
-        <testsuite name="GppGeonameBundle Test Suite">
+        <testsuite name="PallariGeonameBundle Test Suite">
             <directory>tests</directory>
             <exclude>tests/App</exclude>
         </testsuite>

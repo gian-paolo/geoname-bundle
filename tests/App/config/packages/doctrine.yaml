@@ -12,5 +12,5 @@ doctrine:
                 is_bundle: false
                 type: attribute
                 dir: '%kernel.project_dir%/Entity'
-                prefix: 'Gpp\GeonameBundle\Tests\App\Entity'
+                prefix: 'Pallari\GeonameBundle\Tests\App\Entity'
                 alias: App

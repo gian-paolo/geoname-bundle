@@ -1,6 +1,6 @@
 <?php
 
-namespace Gpp\GeonameBundle\Entity;
+namespace Pallari\GeonameBundle\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 
