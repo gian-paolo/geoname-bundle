@@ -141,10 +141,10 @@ YAML;
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Pallari\GeonameBundle\Entity\{$abstractName};
+use Pallari\GeonameBundle\Entity\\$abstractName;
 
 #[ORM\Entity]
-class {$className} extends {$abstractName}
+class $className extends $abstractName
 {
 }
 PHP;
