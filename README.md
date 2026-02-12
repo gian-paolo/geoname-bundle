@@ -50,20 +50,17 @@ gpp_geoname:
 ```
 
 ### Entity Setup
-The bundle only syncs countries and languages that are **enabled** in your database (set `is_enabled = 1` in your `geocountry` and `geolanguage` tables). This allows you to support new search languages without changing the code.
+The bundle only syncs countries and languages that are **enabled** in your database. You need to populate these tables first:
 
-```php
-// src/Entity/GeoName.php
-namespace App\Entity;
+```sql
+-- Enable Italy and USA
+INSERT INTO geocountry (code, name, is_enabled) VALUES ('IT', 'Italy', 1), ('US', 'United States', 1);
 
-use Doctrine\ORM\Mapping as ORM;
-use Pallari\GeonameBundle\Entity\AbstractGeoName;
-
-#[ORM\Entity]
-class GeoName extends AbstractGeoName {
-    // Add your own fields here (e.g., $weather, $images, etc.)
-}
+-- Enable Italian and English for search/translations
+INSERT INTO geolanguage (code, name, is_enabled) VALUES ('it', 'Italian', 1), ('en', 'English', 1);
 ```
+
+To keep the bundle lightweight, you need to create your own entities that extend the bundle's abstract classes. Example:
 
 ---
 

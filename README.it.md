@@ -48,20 +48,17 @@ gpp_geoname:
 ```
 
 ### Setup delle Entità
-Il bundle elabora solo i paesi e le lingue che sono **abilitati** nel database (imposta `is_enabled = 1` nelle tue tabelle `geocountry` e `geolanguage`). Questo ti permette di supportare nuove lingue di ricerca senza dover modificare il codice.
+Il bundle elabora solo i paesi e le lingue che sono **abilitati** nel database. Devi prima popolare queste tabelle:
 
-```php
-// src/Entity/GeoName.php
-namespace App\Entity;
+```sql
+-- Abilita Italia e USA
+INSERT INTO geocountry (code, name, is_enabled) VALUES ('IT', 'Italia', 1), ('US', 'Stati Uniti', 1);
 
-use Doctrine\ORM\Mapping as ORM;
-use Gpp\GeonameBundle\Entity\AbstractGeoName;
-
-#[ORM\Entity]
-class GeoName extends AbstractGeoName {
-    // Qui puoi aggiungere i tuoi campi (es. $clima, $immagini, ecc.)
-}
+-- Abilita Italiano e Inglese per la ricerca/traduzioni
+INSERT INTO geolanguage (code, name, is_enabled) VALUES ('it', 'Italiano', 1), ('en', 'Inglese', 1);
 ```
+
+Per mantenere il bundle leggero, devi creare le tue entità che estendono quelle del bundle. Esempio:
 
 ---
 
