@@ -72,8 +72,33 @@ pallari_geoname:
         geoname: 'my_geoname' # Overrides geoname table name (prefix will be added if set)
 ```
 
-### Entity Setup
-The bundle only syncs countries and languages that are **enabled** in your database. You need to populate these tables first:
+### Entity Setup (Action Required)
+To keep the bundle lightweight and customizable, **you must create your own entity classes** in your `src/Entity/` directory. These classes will extend the bundle's abstract classes.
+
+**1. Create the classes:**
+Create these files in `src/Entity/` (they can be empty classes, they just need to extend the bundle ones):
+- `GeoName.php`, `GeoCountry.php`, `GeoLanguage.php`, `DataImport.php`, `GeoAdmin1.php`, `GeoAdmin2.php`, `GeoAdmin3.php`, `GeoAdmin4.php`, `GeoAlternateName.php`, `GeoHierarchy.php`.
+
+**Example for a city (`src/Entity/GeoName.php`):**
+```php
+namespace App\Entity;
+
+use Doctrine\ORM\Mapping as ORM;
+use Pallari\GeonameBundle\Entity\AbstractGeoName;
+
+#[ORM\Entity]
+class GeoName extends AbstractGeoName {
+    // You can add your own custom fields or relationships here!
+}
+```
+
+**2. Update your Database:**
+```bash
+php bin/console doctrine:schema:update --force
+```
+
+**3. Populate initial settings:**
+The bundle only syncs countries and languages that are **enabled** in your database. Populate these tables first:
 
 ```sql
 -- Enable Italy and USA
@@ -82,8 +107,6 @@ INSERT INTO geocountry (code, name, is_enabled) VALUES ('IT', 'Italy', 1), ('US'
 -- Enable Italian and English for search/translations
 INSERT INTO geolanguage (code, name, is_enabled) VALUES ('it', 'Italian', 1), ('en', 'English', 1);
 ```
-
-To keep the bundle lightweight, you need to create your own entities that extend the bundle's abstract classes. Example:
 
 ---
 
