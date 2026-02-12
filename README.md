@@ -4,23 +4,25 @@
 [![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-777bb4?style=flat-square&logo=php)](https://php.net)
 [![Version](https://img.shields.io/badge/version-0.1.0--beta-orange?style=flat-square)](https://github.com/gian-paolo/geoname-bundle)
 
-**GeonameBundle** è una soluzione sperimentale ad alte prestazioni per integrare e mantenere aggiornati i dati geografici di [GeoNames](https://www.geonames.org/) nelle tue applicazioni Symfony.
-A differenza di altri bundle, questo è progettato per gestire **milioni di record** con un consumo di memoria minimo e un sistema di **aggiornamento quotidiano incrementale** (sync) che evita di dover ricaricare l'intero database ogni volta.
+🇮🇹 [Leggi la documentazione in Italiano](./README.it.md)
+
+**GeonameBundle** is a high-performance solution for integrating and maintaining up-to-date geographical data from [GeoNames](https://www.geonames.org/) in your Symfony applications.
+Unlike other bundles, it is designed to handle **millions of records** with minimal memory consumption and an **incremental daily sync** system that avoids reloading the entire database every time.
 
 ---
 
-## 🚀 Caratteristiche Principali
+## 🚀 Key Features
 
-- **Sincronizzazione Intelligente**: Scarica e applica solo le modifiche e le eliminazioni giornaliere di GeoNames.
-- **Performance SQL Bulk**: Utilizza query SQL ottimizzate (`bulkInsert` e `bulkUpdate`) riducendo il numero di query del 99%.
-- **Strategia Ibrida**: Divide automaticamente i dati tra "nuovi" e "esistenti" per una gestione trasparente e sicura.
-- **Dettaglio Configurabile**: Puoi scegliere di avere il dettaglio completo per certi paesi (es. Italia) e solo le città principali per il resto del mondo.
-- **Multilingua**: Supporto opzionale per i nomi alternativi (traduzioni).
-- **Universale**: Compatibile con **MySQL, MariaDB e PostgreSQL**.
+- **Smart Synchronization**: Downloads and applies only daily changes and deletions from GeoNames.
+- **Bulk SQL Performance**: Uses optimized SQL queries (`bulkInsert` and `bulkUpdate`), reducing the number of queries by 99%.
+- **Hybrid Strategy**: Automatically splits data between "new" and "existing" for transparent and safe management.
+- **Configurable Detail**: Choose full detail for specific countries (e.g., Italy) and only major cities for the rest of the world.
+- **Multilingual**: Optional support for alternate names (translations).
+- **Universal**: Compatible with **MySQL, MariaDB, and PostgreSQL**.
 
 ---
 
-## 🛠 Installazione
+## 🛠 Installation
 
 ```bash
 composer require pallari/geoname-bundle
@@ -28,91 +30,81 @@ composer require pallari/geoname-bundle
 
 ---
 
-## 📝 Configurazione (Per Neofiti)
+## 📝 Configuration
 
-GeoNames fornisce moltissimi dati. Con questo bundle decidi tu cosa tenere nel database. Crea il file `config/packages/gpp_geoname.yaml`:
+GeoNames provides a vast amount of data. With this bundle, you decide what to keep in your database. Create the `config/packages/gpp_geoname.yaml` file:
 
 ```yaml
 gpp_geoname:
     entities:
-        geoname: 'App\Entity\GeoName'      # La tua entità per le città
-        country: 'App\Entity\GeoCountry'    # Stato dei paesi abilitati
-        import: 'App\Entity\DataImport'     # Log delle importazioni
-        admin1: 'App\Entity\GeoAdmin1'      # Nomi Regioni
-        admin2: 'App\Entity\GeoAdmin2'      # Nomi Province
+        geoname: 'App\Entity\GeoName'      # Your entity for cities
+        country: 'App\Entity\GeoCountry'    # Enabled countries status
+        import: 'App\Entity\DataImport'     # Import logs
+        admin1: 'App\Entity\GeoAdmin1'      # Region names
+        admin2: 'App\Entity\GeoAdmin2'      # Province names
     
-    # Se vuoi importare le traduzioni dei nomi
+    # Optional: Import name translations
     alternate_names:
         enabled: true
         languages: ['it', 'en', 'fr']
 ```
 
-### Setup delle Entità
-Per mantenere il bundle leggero e flessibile, devi creare le tue entità che estendono quelle del bundle. Esempio per la città:
+### Entity Setup
+To keep the bundle lightweight, you need to create your own entities that extend the bundle's abstract classes. Example for a city:
 
 ```php
 // src/Entity/GeoName.php
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Gpp\GeonameBundle\Entity\AbstractGeoName;
+use Pallari\GeonameBundle\Entity\AbstractGeoName;
 
 #[ORM\Entity]
 class GeoName extends AbstractGeoName {
-    // Qui puoi aggiungere i tuoi campi (es. $clima, $immagini, ecc.)
+    // Add your own fields here (e.g., $weather, $images, etc.)
 }
 ```
 
 ---
 
-## 📖 Come si usa
+## 📖 Usage
 
-### 1. Importa i nomi di Regioni e Province
-I codici amministrativi (es. "IT.09") sono inutili se non sappiamo che significano "Piemonte". Esegui questo comando una volta:
+### 1. Import Administrative Codes
+Administrative codes (e.g., "IT.09") need their labels (e.g., "Piemonte"). Run this command once:
 ```bash
 php bin/console gpp:geoname:import-admin-codes
 ```
 
-### 2. Sincronizza i dati (Import & Daily Sync)
-Questo è il comando che userai più spesso. La prima volta scaricherà i dati completi, poi scaricherà solo gli aggiornamenti del giorno precedente:
+### 2. Synchronize Data (Import & Daily Sync)
+This is the command you'll use most often. The first time it will download full data, then it will only download updates from the previous day:
 ```bash
 php bin/console gpp:geoname:sync
 ```
-*Suggerimento: metti questo comando nel tuo **Crontab** per farlo girare ogni mattina alle 06:00.*
+*Tip: Add this command to your **Crontab** to run every morning at 06:00 UTC.*
 
 ---
 
-## ⚙️ Dettagli Tecnici (Per Esperti)
+## ⚙️ Technical Details
 
-### Strategia di Aggiornamento "Hybrid"
-Invece di usare un rischioso `UPSERT` (come `ON DUPLICATE KEY UPDATE`), il bundle segue un processo in 3 fasi per ogni blocco di 1000 righe:
-1. **Check**: Interroga il DB per identificare quali ID esistono già.
-2. **Split**: Divide il blocco in due liste: `$toInsert` e `$toUpdate`.
-3. **Execute**: Esegue una singola `INSERT` multi-riga e una `UPDATE` multi-riga (usando la sintassi `CASE WHEN`).
-**Risultato**: Solo 3 query totali per ogni 1000 record, mantenendo integrità e trasparenza totale.
+### "Hybrid" Update Strategy
+Instead of using a risky `UPSERT` (like `ON DUPLICATE KEY UPDATE`), the bundle follows a 3-phase process for every block of 1000 rows:
+1. **Check**: Queries the DB to identify which IDs already exist.
+2. **Split**: Divides the block into two lists: `$toInsert` and `$toUpdate`.
+3. **Execute**: Performs a single multi-row `INSERT` and a multi-row `UPDATE` (using `CASE WHEN` syntax).
+**Result**: Only 3 total queries per 1000 records, maintaining full integrity and transparency.
 
-### Indici Consigliati
-Per ricerche istantanee, aggiungi questi indici alle tue entità concrete:
+### Recommended Indexes
+For instant searches, add these indexes to your concrete entities:
 
 ```php
-// Indice standard per ricerche per nome e paese
+// Standard index for name and country searches
 #[ORM\Index(columns: ['name', 'country_code'], name: 'idx_search')]
 
-// Indice FULLTEXT per ricerche "fuzzy" (solo MySQL/MariaDB)
+// FULLTEXT index for fuzzy searches (MySQL/MariaDB only)
 #[ORM\Index(columns: ['name', 'asciiname'], name: 'idx_fulltext', flags: ['fulltext'])]
 ```
 
-### Esempio Query SQL
-Come unire le tabelle per ottenere un indirizzo completo:
-```sql
-SELECT c.name as citta, a1.name as regione, a2.name as provincia
-FROM geo_name c
-LEFT JOIN geo_admin1 a1 ON a1.code = CONCAT(c.country_code, '.', c.admin1_code)
-LEFT JOIN geo_admin2 a2 ON a2.code = CONCAT(c.country_code, '.', c.admin1_code, '.', c.admin2_code)
-WHERE c.name LIKE 'Torino%' AND c.is_deleted = 0;
-```
-
 ---
 
-## 📄 Licenza
-Questo progetto è rilasciato sotto licenza MIT. Sviluppato con ❤️ da **Gian-Paolo Pallari**.
+## 📄 License
+This project is released under the MIT License. Developed with ❤️ by **Gian-Paolo Pallari**.
