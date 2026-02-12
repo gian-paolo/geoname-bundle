@@ -13,10 +13,10 @@
         "php": ">=8.2",
         "symfony/framework-bundle": "^6.4|^7.0|^8.0",
         "doctrine/doctrine-bundle": "^2.10",
+        "doctrine/orm": "^3.0",
         "symfony/http-client": "^6.4|^7.0|^8.0"
     },
     "require-dev": {
-        "doctrine/orm": "^3.6",
         "phpunit/phpunit": "^13.0",
         "symfony/phpunit-bridge": "^8.0",
         "symfony/yaml": "^8.0"
