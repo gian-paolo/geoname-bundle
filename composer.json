@@ -1,5 +1,5 @@
 {
-    "name": "gian-paolo/geoname-bundle",
+    "name": "pallari/geoname-bundle",
     "description": "A Symfony bundle for GeoNames with incremental daily updates support.",
     "type": "symfony-bundle",
     "license": "MIT",
