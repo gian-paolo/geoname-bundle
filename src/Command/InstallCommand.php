@@ -87,6 +87,7 @@ class InstallCommand extends Command
         }
 
         $useFulltext = $io->confirm('Enable Full-Text search? (Requires MySQL/PostgreSQL)', false);
+        $fulltextString = $useFulltext ? 'true' : 'false';
 
         $content = <<<YAML
 pallari_geoname:
@@ -105,7 +106,7 @@ pallari_geoname:
 
     # Performance options
     search:
-        use_fulltext: {$(($useFulltext ? 'true' : 'false'))}
+        use_fulltext: {$fulltextString}
 
     # Optional features
     alternate_names:
@@ -113,8 +114,6 @@ pallari_geoname:
     admin5:
         enabled: false
 YAML;
-        // Fix for heredoc variable interpolation
-        $content = str_replace('{$(($useFulltext ? \'true\' : \'false\'))}', $useFulltext ? 'true' : 'false', $content);
 
         $fs->dumpFile($configFile, $content);
         $io->writeln(' <info>✔</info> Created config/packages/pallari_geoname.yaml');
