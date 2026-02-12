@@ -141,5 +141,13 @@ If `search.use_fulltext` is enabled, the bundle automatically uses:
 
 ---
 
+## ⚖️ Disclaimer
+
+This bundle is an independent, open-source project and is **not affiliated, associated, authorized, endorsed by, or in any way officially connected** with [GeoNames.org](https://www.geonames.org/). 
+
+The data provided by the synchronization commands is owned and maintained by GeoNames. Please respect their [Terms and Conditions](https://www.geonames.org/export/credits.html) and consider supporting them if you find their data useful.
+
+---
+
 ## 📄 License
 This project is released under the MIT License. Developed with ❤️ by **Gian-Paolo Pallari**.

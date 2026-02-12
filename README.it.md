@@ -161,5 +161,13 @@ WHERE c.name LIKE 'Torino%' AND c.is_deleted = 0;
 
 ---
 
+## ⚖️ Disclaimer (Dichiarazione di non responsabilità)
+
+Questo bundle è un progetto open-source indipendente e **non è affiliato, associato, autorizzato, approvato o in alcun modo ufficialmente collegato** con [GeoNames.org](https://www.geonames.org/).
+
+I dati forniti dai comandi di sincronizzazione appartengono e sono gestiti da GeoNames. Si prega di rispettare i loro [Termini e Condizioni](https://www.geonames.org/export/credits.html) e di considerare l'idea di sostenerli se trovate i loro dati utili.
+
+---
+
 ## 📄 Licenza
 Questo progetto è rilasciato sotto licenza MIT. Sviluppato con ❤️ da **Gian-Paolo Pallari**.
