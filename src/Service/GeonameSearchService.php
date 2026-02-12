@@ -11,7 +11,8 @@ class GeonameSearchService
         private readonly Connection $connection,
         private readonly string $geonameTable,
         private readonly string $admin1Table,
-        private readonly string $admin2Table
+        private readonly string $admin2Table,
+        private readonly bool $useFulltext = false
     ) {}
 
     /**
@@ -27,20 +28,30 @@ class GeonameSearchService
     public function search(string $term, array $options = []): array
     {
         $qb = $this->connection->createQueryBuilder();
+        $platform = $this->connection->getDatabasePlatform()->getName();
         
         // Base selection
         $qb->select('g.geonameid', 'g.name', 'g.ascii_name', 'g.country_code', 'g.latitude', 'g.longitude', 'g.population', 'g.feature_code');
         $qb->from($this->geonameTable, 'g');
         $qb->where('g.is_deleted = 0');
 
-        // Text search (on name, asciiname and alternate_names)
-        $qb->andWhere(
-            $qb->expr()->or(
-                'g.name LIKE :term',
-                'g.ascii_name LIKE :term',
-                'g.alternate_names LIKE :term'
-            )
-        )->setParameter('term', $term . '%');
+        // Text search strategy
+        if ($this->useFulltext) {
+            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+                // MySQL/MariaDB Full-Text Search
+                $qb->andWhere('MATCH(g.name, g.ascii_name, g.alternate_names) AGAINST(:term IN BOOLEAN MODE)');
+                $qb->setParameter('term', $term . '*');
+            } elseif (str_contains($platform, 'postgresql')) {
+                // PostgreSQL Full-Text Search (simple configuration for multi-language)
+                $qb->andWhere("to_tsvector('simple', g.name || ' ' || g.ascii_name || ' ' || g.alternate_names) @@ to_tsquery('simple', :term)");
+                $qb->setParameter('term', $term . ':*');
+            } else {
+                // Fallback for other platforms
+                $this->applyLikeSearch($qb, $term);
+            }
+        } else {
+            $this->applyLikeSearch($qb, $term);
+        }
 
         // Optional: Join Admin Names
         if ($options['with_admin_names'] ?? false) {
@@ -76,5 +87,16 @@ class GeonameSearchService
         $qb->setMaxResults($options['limit'] ?? 10);
 
         return $qb->executeQuery()->fetchAllAssociative();
+    }
+
+    private function applyLikeSearch(QueryBuilder $qb, string $term): void
+    {
+        $qb->andWhere(
+            $qb->expr()->or(
+                'g.name LIKE :term',
+                'g.ascii_name LIKE :term',
+                'g.alternate_names LIKE :term'
+            )
+        )->setParameter('term', $term . '%');
     }
 }

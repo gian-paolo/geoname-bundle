@@ -53,6 +53,10 @@ gpp_geoname:
     # Abilita la sincronizzazione dei nomi alternativi
     alternate_names:
         enabled: true
+
+    # Performance: Abilita la ricerca Full-Text
+    search:
+        use_fulltext: true
 ```
 
 ### Setup delle Entità

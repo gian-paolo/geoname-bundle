@@ -11,6 +11,7 @@ services:
             $geonameTable: '%gpp_geoname.tables.geoname%'
             $admin1Table: '%gpp_geoname.tables.admin1%'
             $admin2Table: '%gpp_geoname.tables.admin2%'
+            $useFulltext: '%gpp_geoname.search.use_fulltext%'
 
     Gpp\GeonameBundle\Service\GeonameHierarchyService:
         arguments:

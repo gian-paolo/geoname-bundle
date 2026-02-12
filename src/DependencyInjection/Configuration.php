@@ -45,6 +45,12 @@ class Configuration implements ConfigurationInterface
                         ->booleanNode('enabled')->defaultFalse()->end()
                     ->end()
                 ->end()
+                ->arrayNode('search')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('use_fulltext')->defaultFalse()->end()
+                    ->end()
+                ->end()
                 ->scalarNode('temp_dir')->defaultValue('%kernel.project_dir%/var/tmp/geoname')->end()
             ->end();
 

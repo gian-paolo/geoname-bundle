@@ -55,6 +55,10 @@ gpp_geoname:
     # Enable alternate names sync
     alternate_names:
         enabled: true
+
+    # Performance: Enable Full-Text Search
+    search:
+        use_fulltext: true
 ```
 
 ### Entity Setup
