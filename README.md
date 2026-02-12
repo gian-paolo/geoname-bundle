@@ -126,17 +126,11 @@ Instead of using a risky `UPSERT` (like `ON DUPLICATE KEY UPDATE`), the bundle f
 3. **Execute**: Performs a single multi-row `INSERT` and a multi-row `UPDATE` (using `CASE WHEN` syntax).
 **Result**: Only 3 total queries per 1000 records, maintaining full integrity and transparency.
 
-### Recommended Indexes
-For instant searches, add these indexes to your concrete entities:
-
-```php
-// Standard index for name and country searches
-#[ORM\Index(columns: ['name', 'country_code'], name: 'idx_search')]
-
-// FULLTEXT index for fuzzy searches (MySQL/MariaDB only)
-// Now includes alternate_names for better global search results
-#[ORM\Index(columns: ['name', 'asciiname', 'alternatenames'], name: 'idx_fulltext', flags: ['fulltext'])]
-```
+### Full-Text Search
+If `search.use_fulltext` is enabled, the bundle automatically uses:
+- `MATCH AGAINST` for MySQL/MariaDB.
+- `to_tsvector` for PostgreSQL.
+- **Note**: For SQLite (common in testing), the bundle will automatically fallback to standard `LIKE` searches to ensure compatibility.
 
 ---
 

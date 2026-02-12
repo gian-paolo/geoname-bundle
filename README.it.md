@@ -136,6 +136,12 @@ Per ricerche istantanee, aggiungi questi indici alle tue entità concrete:
 #[ORM\Index(columns: ['name', 'asciiname', 'alternatenames'], name: 'idx_fulltext', flags: ['fulltext'])]
 ```
 
+### Ricerca Full-Text
+Se `search.use_fulltext` è abilitato, il bundle usa automaticamente:
+- `MATCH AGAINST` per MySQL/MariaDB.
+- `to_tsvector` per PostgreSQL.
+- **Nota**: Per SQLite (comune nei test), il bundle userà automaticamente il fallback alla ricerca `LIKE` standard per garantire la compatibilità.
+
 ### Esempio Query SQL
 Come unire le tabelle per ottenere un indirizzo completo:
 ```sql
