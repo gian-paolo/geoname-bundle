@@ -55,7 +55,7 @@ class GeonameImporter
 
     public function importFull(string $url, ?array $allowedCountries = null): void
     {
-        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
+        $this->disableLogging();
         $importLog = $this->createImportLog('full_import', $url);
         
         try {
@@ -80,7 +80,7 @@ class GeonameImporter
 
     public function importHierarchy(string $url): int
     {
-        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
+        $this->disableLogging();
         $filePath = $this->downloadFile($url);
         if (str_ends_with($url, '.zip')) {
             $filePath = $this->unzip($filePath);
@@ -202,7 +202,7 @@ class GeonameImporter
 
     public function importAdminCodes(string $url, string $entityClass): int
     {
-        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
+        $this->disableLogging();
         $filePath = $this->downloadFile($url);
         $total = 0;
         $conn = $this->em->getConnection();
@@ -249,7 +249,7 @@ class GeonameImporter
 
     public function importAdmin5(string $url, string $tableName): int
     {
-        $this->em->getConnection()->getConfiguration()->setSQLLogger(null);
+        $this->disableLogging();
         $filePath = $this->downloadFile($url);
         if (str_ends_with($url, '.zip')) {
             $filePath = $this->unzip($filePath);
@@ -506,6 +506,17 @@ class GeonameImporter
             sprintf("UPDATE `%s` SET status = ?, error_message = ?, ended_at = ? WHERE id = ?", $this->importTableName),
             [AbstractGeoImport::STATUS_FAILED, $error, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
         );
+    }
+
+    private function disableLogging(): void
+    {
+        $config = $this->em->getConnection()->getConfiguration();
+        if (method_exists($config, 'setSQLLogger')) {
+            $config->setSQLLogger(null);
+        }
+        if (method_exists($config, 'setMiddlewares')) {
+            $config->setMiddlewares([]);
+        }
     }
 
     private function downloadFile(string $url): string
