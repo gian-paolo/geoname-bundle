@@ -205,24 +205,29 @@ class GeonameImporter
         }
 
         foreach ($this->parser->getBatches($filePath, 500) as $batch) {
+            $values = [];
+            $placeholders = [];
             foreach ($batch as $row) {
                 if (count($row) < 4) continue;
                 
-                $data = [
-                    'code' => $row[0],
-                    'name' => $row[1],
-                    'asciiname' => $row[2],
-                    'geonameid' => (int)$row[3]
-                ];
-
-                $sql = sprintf(
-                    "INSERT INTO `%s` (code, name, asciiname, geonameid) VALUES (?, ?, ?, ?) 
-                     ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)",
-                    $tableName
-                );
-                $conn->executeStatement($sql, array_values($data));
+                $placeholders[] = '(?, ?, ?, ?)';
+                $values[] = $row[0]; // code
+                $values[] = $row[1]; // name
+                $values[] = $row[2]; // asciiname
+                $values[] = (int)$row[3]; // geonameid
                 $total++;
             }
+
+            if (empty($placeholders)) continue;
+
+            $sql = sprintf(
+                "INSERT INTO `%s` (code, name, asciiname, geonameid) VALUES %s 
+                 ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)",
+                $tableName,
+                implode(', ', $placeholders)
+            );
+            
+            $conn->executeStatement($sql, $values);
         }
         
         unlink($filePath);
