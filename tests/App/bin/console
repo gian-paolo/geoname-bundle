@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-use Gpp\GeonameBundle\Tests\App\Kernel;
+use Pallari\GeonameBundle\Tests\App\Kernel;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Dotenv\Dotenv;
 

@@ -3,13 +3,13 @@
 namespace Pallari\GeonameBundle\Command;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Filesystem\Filesystem;
 
 #[AsCommand(
@@ -45,20 +45,27 @@ class InstallCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $io->title('🌍 GeonameBundle - Interactive Installer');
 
+        // Detect project context
+        $isTestEnv = str_contains($this->projectDir, 'tests/App');
+        $defaultNamespace = $isTestEnv ? 'Pallari\GeonameBundle\Tests\App\Entity' : 'App\Entity';
+        $defaultEntityDir = $this->projectDir . ($isTestEnv ? '/Entity' : '/src/Entity');
+
+        $namespace = $io->ask('Entity namespace?', $defaultNamespace);
+        $entityDir = $io->ask('Entity directory?', $defaultEntityDir);
+
         // 1. Generate Config YAML
-        if ($io->confirm('Step 1: Generate configuration file in config/packages/pallari_geoname.yaml?', true)) {
-            $this->generateConfig($io);
+        if ($io->confirm('Step 1: Generate configuration file?', true)) {
+            $this->generateConfig($io, $namespace);
         }
 
         // 2. Generate Entities
-        if ($io->confirm('Step 2: Generate entity files in src/Entity/?', true)) {
-            $this->generateEntities($io);
+        if ($io->confirm('Step 2: Generate entity files?', true)) {
+            $this->generateEntities($io, $namespace, $entityDir);
         }
 
         // 3. Update Schema
         if ($io->confirm('Step 3: Create/Update database schema?', true)) {
-            $this->runCommand('doctrine:schema:update', ['--force' => true], $output);
-            $io->success('Database schema updated.');
+            $this->updateSchema($io);
         }
 
         // 4. Initial Data
@@ -68,41 +75,55 @@ class InstallCommand extends Command
 
         // 5. Run First Sync
         if ($io->confirm('Step 5: Run initial synchronization now? (This may take a while)', false)) {
-            $this->runCommand('pallari:geoname:import-admin-codes', [], $output);
-            $this->runCommand('pallari:geoname:sync', [], $output);
+            try {
+                $this->runCommand('pallari:geoname:import-admin-codes', [], $output);
+                $this->runCommand('pallari:geoname:sync', [], $output);
+            } catch (\Exception $e) {
+                $io->error('Synchronization failed: ' . $e->getMessage());
+            }
         }
 
         $io->success('Installation completed successfully!');
         return Command::SUCCESS;
     }
 
-    private function generateConfig(SymfonyStyle $io): void
+    private function generateConfig(SymfonyStyle $io, string $namespace): void
     {
         $fs = new Filesystem();
-        $configFile = $this->projectDir . '/config/packages/pallari_geoname.yaml';
+        
+        // Try to find the correct config directory
+        $configDir = $this->projectDir . '/config/packages';
+        if (!$fs->exists($configDir)) {
+            $fs->mkdir($configDir);
+        }
+        
+        $configFile = $configDir . '/pallari_geoname.yaml';
 
         if ($fs->exists($configFile)) {
-            $io->note('Configuration file already exists, skipping.');
-            return;
+            if (!$io->confirm('Configuration file already exists. Overwrite?', false)) {
+                return;
+            }
         }
 
         $useFulltext = $io->confirm('Enable Full-Text search? (Requires MySQL/PostgreSQL)', false);
         $fulltextString = $useFulltext ? 'true' : 'false';
 
+        $namespace = rtrim($namespace, '\\');
+
         $content = <<<YAML
 pallari_geoname:
-    # Entities mapping (default names)
+    # Entities mapping
     entities:
-        geoname: 'App\Entity\GeoName'
-        country: 'App\Entity\GeoCountry'
-        language: 'App\Entity\GeoLanguage'
-        import: 'App\Entity\GeoImport'
-        admin1: 'App\Entity\GeoAdmin1'
-        admin2: 'App\Entity\GeoAdmin2'
-        admin3: 'App\Entity\GeoAdmin3'
-        admin4: 'App\Entity\GeoAdmin4'
-        alternate_name: 'App\Entity\GeoAlternateName'
-        hierarchy: 'App\Entity\GeoHierarchy'
+        geoname: '$namespace\GeoName'
+        country: '$namespace\GeoCountry'
+        language: '$namespace\GeoLanguage'
+        import: '$namespace\GeoImport'
+        admin1: '$namespace\GeoAdmin1'
+        admin2: '$namespace\GeoAdmin2'
+        admin3: '$namespace\GeoAdmin3'
+        admin4: '$namespace\GeoAdmin4'
+        alternate_name: '$namespace\GeoAlternateName'
+        hierarchy: '$namespace\GeoHierarchy'
 
     # Performance options
     search:
@@ -116,17 +137,18 @@ pallari_geoname:
 YAML;
 
         $fs->dumpFile($configFile, $content);
-        $io->writeln(' <info>✔</info> Created config/packages/pallari_geoname.yaml');
+        $io->writeln(sprintf(' <info>✔</info> Created %s', $configFile));
     }
 
-    private function generateEntities(SymfonyStyle $io): void
+    private function generateEntities(SymfonyStyle $io, string $namespace, string $entityDir): void
     {
         $fs = new Filesystem();
-        $entityDir = $this->projectDir . '/src/Entity';
 
         if (!$fs->exists($entityDir)) {
             $fs->mkdir($entityDir);
         }
+
+        $namespace = rtrim($namespace, '\\');
 
         foreach (self::ENTITIES as $className => $abstractName) {
             $filePath = $entityDir . '/' . $className . '.php';
@@ -138,7 +160,7 @@ YAML;
             $content = <<<PHP
 <?php
 
-namespace App\Entity;
+namespace $namespace;
 
 use Doctrine\ORM\Mapping as ORM;
 use Pallari\GeonameBundle\Entity\\$abstractName;
@@ -149,8 +171,22 @@ class $className extends $abstractName
 }
 PHP;
             $fs->dumpFile($filePath, $content);
-            $io->writeln(sprintf(' <info>✔</info> Created src/Entity/%s.php', $className));
+            $io->writeln(sprintf(' <info>✔</info> Created %s', $filePath));
         }
+    }
+
+    private function updateSchema(SymfonyStyle $io): void
+    {
+        $tool = new SchemaTool($this->em);
+        $metadatas = $this->em->getMetadataFactory()->getAllMetadata();
+        
+        if (empty($metadatas)) {
+            $io->warning('No metadata found. Make sure your entities are correctly configured and registered.');
+            return;
+        }
+
+        $tool->updateSchema($metadatas, true);
+        $io->success('Database schema updated using SchemaTool.');
     }
 
     private function setupInitialData(SymfonyStyle $io): void

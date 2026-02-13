@@ -86,6 +86,9 @@ class GeonameRepository extends ServiceEntityRepository
         }
         $pkColumn = $columnMap[$pkField];
 
+        $platform = $conn->getDatabasePlatform();
+        $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
+
         $totalUpdated = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
             $ids = [];
@@ -96,7 +99,8 @@ class GeonameRepository extends ServiceEntityRepository
             unset($updateCols[$pkField]);
 
             foreach ($updateCols as $prop => $col) {
-                $setClauses[$col] = "`$col` = CASE `$pkColumn` ";
+                $colQuoted = $platform->quoteIdentifier($col);
+                $setClauses[$col] = "$colQuoted = CASE $pkColumnQuoted ";
             }
 
             foreach ($chunk as $row) {
@@ -126,10 +130,10 @@ class GeonameRepository extends ServiceEntityRepository
             }
 
             $sql = sprintf(
-                "UPDATE `%s` SET %s WHERE `%s` IN (%s)",
-                $tableName,
+                "UPDATE %s SET %s WHERE %s IN (%s)",
+                $platform->quoteIdentifier($tableName),
                 implode(', ', $sqlSet),
-                $pkColumn,
+                $pkColumnQuoted,
                 implode(', ', $ids)
             );
 
@@ -160,8 +164,13 @@ class GeonameRepository extends ServiceEntityRepository
         $metadata = $this->getClassMetadata();
         $tableName = $metadata->getTableName();
         $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
+        $platform = $conn->getDatabasePlatform();
 
-        $sql = sprintf("SELECT `%s` FROM `%s` WHERE `%s` IN (?)", $pkColumn, $tableName, $pkColumn);
+        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (?)", 
+            $platform->quoteIdentifier($pkColumn), 
+            $platform->quoteIdentifier($tableName), 
+            $platform->quoteIdentifier($pkColumn)
+        );
         $result = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
         
         return $result->fetchFirstColumn();

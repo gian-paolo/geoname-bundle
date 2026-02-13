@@ -154,9 +154,9 @@ php bin/console pallari:geoname:sync
 Il bundle offre un servizio `GeonameSearchService` ad alte prestazioni per trovare città e località con il loro contesto amministrativo (regioni, province).
 
 ```php
-use Gpp\GeonameBundle\Service\GeonameSearchService;
+use Pallari\GeonameBundle\Service\GeonameSearchService;
 
-public function miaRicerca(GeonameSearchService $searchService)
+public function searchExample(GeonameSearchService $searchService)
 {
     $results = $searchService->search('Torino', [
         'countries' => ['IT'],

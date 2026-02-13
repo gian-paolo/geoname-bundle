@@ -66,12 +66,8 @@ abstract class AbstractGeoName
     #[ORM\Column(name: 'is_deleted')]
     protected bool $isDeleted = false;
 
-    // Getters e Setters ... (li ometto per brevità nella creazione iniziale, ma ci saranno)
-    
     public function getId(): ?int { return $this->id; }
     public function setId(int $id): self { $this->id = $id; return $this; }
     public function isDeleted(): bool { return $this->isDeleted; }
     public function setIsDeleted(bool $isDeleted): self { $this->isDeleted = $isDeleted; return $this; }
-    
-    // Altri metodi comuni verranno aggiunti nel file finale
 }
