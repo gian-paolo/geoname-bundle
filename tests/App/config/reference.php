@@ -926,21 +926,35 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         import?: scalar|Param|null, // Default: "App\\Entity\\GeoImport"
  *         admin1?: scalar|Param|null, // Default: "App\\Entity\\GeoAdmin1"
  *         admin2?: scalar|Param|null, // Default: "App\\Entity\\GeoAdmin2"
+ *         admin3?: scalar|Param|null, // Default: "App\\Entity\\GeoAdmin3"
+ *         admin4?: scalar|Param|null, // Default: "App\\Entity\\GeoAdmin4"
+ *         admin5?: scalar|Param|null, // Default: "App\\Entity\\GeoAdmin5"
+ *         language?: scalar|Param|null, // Default: "App\\Entity\\GeoLanguage"
  *         alternate_name?: scalar|Param|null, // Default: "App\\Entity\\GeoAlternateName"
  *         hierarchy?: scalar|Param|null, // Default: "App\\Entity\\GeoHierarchy"
  *     },
  *     tables?: array{
  *         geoname?: scalar|Param|null, // Default: "geoname"
- *         country?: scalar|Param|null, // Default: "geocountry"
- *         import?: scalar|Param|null, // Default: "geoimport"
- *         admin1?: scalar|Param|null, // Default: "geoadmin1"
- *         admin2?: scalar|Param|null, // Default: "geoadmin2"
- *         alternate_name?: scalar|Param|null, // Default: "geoalternatename"
- *         hierarchy?: scalar|Param|null, // Default: "geohierarchy"
+ *         country?: scalar|Param|null, // Default: "country"
+ *         import?: scalar|Param|null, // Default: "import"
+ *         admin1?: scalar|Param|null, // Default: "admin1"
+ *         admin2?: scalar|Param|null, // Default: "admin2"
+ *         admin3?: scalar|Param|null, // Default: "admin3"
+ *         admin4?: scalar|Param|null, // Default: "admin4"
+ *         admin5?: scalar|Param|null, // Default: "admin5"
+ *         alternate_name?: scalar|Param|null, // Default: "alternate_name"
+ *         hierarchy?: scalar|Param|null, // Default: "hierarchy"
+ *         language?: scalar|Param|null, // Default: "language"
  *     },
+ *     table_prefix?: scalar|Param|null, // Default: "geoname_"
  *     alternate_names?: array{
  *         enabled?: bool|Param, // Default: false
- *         languages?: list<scalar|Param|null>,
+ *     },
+ *     admin5?: array{
+ *         enabled?: bool|Param, // Default: false
+ *     },
+ *     search?: array{
+ *         use_fulltext?: bool|Param, // Default: false
  *     },
  *     temp_dir?: scalar|Param|null, // Default: "%kernel.project_dir%/var/tmp/geoname"
  * }

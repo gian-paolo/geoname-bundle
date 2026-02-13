@@ -63,3 +63,30 @@ services:
             $admin1EntityClass: '%pallari_geoname.entities.admin1%'
             $admin2EntityClass: '%pallari_geoname.entities.admin2%'
         tags: ['console.command']
+
+    Pallari\GeonameBundle\EventListener\TablePrefixListener:
+        arguments:
+            $entities:
+                geoname: '%pallari_geoname.entities.geoname%'
+                country: '%pallari_geoname.entities.country%'
+                import: '%pallari_geoname.entities.import%'
+                admin1: '%pallari_geoname.entities.admin1%'
+                admin2: '%pallari_geoname.entities.admin2%'
+                admin3: '%pallari_geoname.entities.admin3%'
+                admin4: '%pallari_geoname.entities.admin4%'
+                admin5: '%pallari_geoname.entities.admin5%'
+                alternate_name: '%pallari_geoname.entities.alternate_name%'
+                hierarchy: '%pallari_geoname.entities.hierarchy%'
+                language: '%pallari_geoname.entities.language%'
+            $tables:
+                geoname: '%pallari_geoname.tables.geoname%'
+                country: '%pallari_geoname.tables.country%'
+                import: '%pallari_geoname.tables.import%'
+                admin1: '%pallari_geoname.tables.admin1%'
+                admin2: '%pallari_geoname.tables.admin2%'
+                admin3: '%pallari_geoname.tables.admin3%'
+                admin4: '%pallari_geoname.tables.admin4%'
+                admin5: '%pallari_geoname.tables.admin5%'
+                alternate_name: '%pallari_geoname.tables.alternate_name%'
+                hierarchy: '%pallari_geoname.tables.hierarchy%'
+                language: '%pallari_geoname.tables.language%'
