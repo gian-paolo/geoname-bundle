@@ -5,8 +5,8 @@ namespace Pallari\GeonameBundle\Service;
 use Doctrine\ORM\EntityManagerInterface;
 use Pallari\GeonameBundle\Entity\AbstractGeoImport;
 use Pallari\GeonameBundle\Entity\AbstractGeoName;
-use Pallari\GeonameBundle\Repository\GeonameRepository;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Doctrine\ORM\Mapping\ClassMetadata;
 
 class GeonameImporter
 {
@@ -17,10 +17,6 @@ class GeonameImporter
     private string $hierarchyTableName = 'geohierarchy';
     private string $alternateNameTableName = 'geoalternatename';
     private array $adminTableNames = [];
-    /** @var GeonameRepository */
-    private $repository;
-    /** @var GeonameRepository */
-    private $alternateNameRepository;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -33,12 +29,7 @@ class GeonameImporter
     {
         $this->geonameEntityClass = $geonameEntityClass;
         $this->importEntityClass = $importEntityClass;
-        $this->repository = $this->em->getRepository($this->geonameEntityClass);
-
-        if ($alternateNameEntityClass) {
-            $this->alternateNameEntityClass = $alternateNameEntityClass;
-            $this->alternateNameRepository = $this->em->getRepository($this->alternateNameEntityClass);
-        }
+        $this->alternateNameEntityClass = $alternateNameEntityClass;
     }
 
     public function setAdminTableNames(array $tables): void
@@ -159,7 +150,7 @@ class GeonameImporter
 
         if (empty($ids)) return 0;
 
-        $existingIds = $this->alternateNameRepository->findExistingIds($ids);
+        $existingIds = $this->findExistingIds($this->alternateNameEntityClass, $ids);
         $toUpdate = [];
         $toInsert = [];
 
@@ -172,8 +163,8 @@ class GeonameImporter
         }
 
         $count = 0;
-        if (!empty($toInsert)) $count += $this->alternateNameRepository->bulkInsert($toInsert);
-        if (!empty($toUpdate)) $count += $this->alternateNameRepository->bulkUpdate($toUpdate, 'id');
+        if (!empty($toInsert)) $count += $this->bulkInsert($this->alternateNameEntityClass, $toInsert);
+        if (!empty($toUpdate)) $count += $this->bulkUpdate($this->alternateNameEntityClass, $toUpdate, 'id');
 
         return $count;
     }
@@ -330,7 +321,7 @@ class GeonameImporter
 
         if (empty($ids)) return 0;
 
-        $existingIds = $this->repository->findExistingIds($ids);
+        $existingIds = $this->findExistingIds($this->geonameEntityClass, $ids);
         
         $toUpdate = [];
         $toInsert = [];
@@ -344,8 +335,8 @@ class GeonameImporter
         }
 
         $count = 0;
-        if (!empty($toInsert)) $count += $this->repository->bulkInsert($toInsert);
-        if (!empty($toUpdate)) $count += $this->repository->bulkUpdate($toUpdate, 'id');
+        if (!empty($toInsert)) $count += $this->bulkInsert($this->geonameEntityClass, $toInsert);
+        if (!empty($toUpdate)) $count += $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
 
         $this->syncAdminTablesFromBatch($toProcess);
 
@@ -426,7 +417,7 @@ class GeonameImporter
         if (empty($ids)) return 0;
 
         $deleteData = array_map(fn($id) => ['id' => $id, 'isDeleted' => true], $ids);
-        return $this->repository->bulkUpdate($deleteData, 'id');
+        return $this->bulkUpdate($this->geonameEntityClass, $deleteData, 'id');
     }
 
     private function processAlternateDeleteBatch(array $batch): int
@@ -553,5 +544,150 @@ class GeonameImporter
             return $files[0];
         }
         throw new \RuntimeException('Failed to unzip file');
+    }
+
+    private function bulkInsert(string $entityClass, array $rows, int $chunkSize = 1000): int
+    {
+        if (empty($rows)) return 0;
+
+        $conn = $this->em->getConnection();
+        $metadata = $this->em->getClassMetadata($entityClass);
+        $tableName = $metadata->getTableName();
+        
+        $columnMap = $this->getColumnMap($metadata);
+        $columns = array_values($columnMap);
+        
+        $platform = $conn->getDatabasePlatform();
+        $quotedColumns = array_map(fn($c) => $platform->quoteIdentifier($c), $columns);
+        $columnsSql = implode(', ', $quotedColumns);
+
+        $totalInserted = 0;
+        foreach (array_chunk($rows, $chunkSize) as $chunk) {
+            $placeholders = [];
+            $params = [];
+
+            foreach ($chunk as $row) {
+                $rowPlaceholders = [];
+                foreach ($columnMap as $prop => $col) {
+                    $val = $row[$prop] ?? null;
+                    if ($val instanceof \DateTimeInterface) {
+                        $val = $val->format('Y-m-d H:i:s');
+                    } elseif (is_bool($val)) {
+                        $val = $val ? 1 : 0;
+                    }
+                    $params[] = $val;
+                    $rowPlaceholders[] = '?';
+                }
+                $placeholders[] = '(' . implode(', ', $rowPlaceholders) . ')';
+            }
+
+            $sql = sprintf(
+                'INSERT INTO %s (%s) VALUES %s',
+                $platform->quoteIdentifier($tableName),
+                $columnsSql,
+                implode(', ', $placeholders)
+            );
+
+            $totalInserted += $conn->executeStatement($sql, $params);
+        }
+
+        return $totalInserted;
+    }
+
+    private function bulkUpdate(string $entityClass, array $rows, string $pkField = 'id', int $chunkSize = 1000): int
+    {
+        if (empty($rows)) return 0;
+
+        $conn = $this->em->getConnection();
+        $metadata = $this->em->getClassMetadata($entityClass);
+        $tableName = $metadata->getTableName();
+        $columnMap = $this->getColumnMap($metadata);
+        
+        if (!isset($columnMap[$pkField])) {
+            throw new \InvalidArgumentException("Primary key field '$pkField' not found.");
+        }
+        $pkColumn = $columnMap[$pkField];
+
+        $platform = $conn->getDatabasePlatform();
+        $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
+
+        $totalUpdated = 0;
+        foreach (array_chunk($rows, $chunkSize) as $chunk) {
+            $ids = [];
+            $setClauses = [];
+            
+            $updateCols = $columnMap;
+            unset($updateCols[$pkField]);
+
+            foreach ($updateCols as $prop => $col) {
+                $colQuoted = $platform->quoteIdentifier($col);
+                $setClauses[$col] = "$colQuoted = CASE $pkColumnQuoted ";
+            }
+
+            foreach ($chunk as $row) {
+                $pkVal = $row[$pkField] ?? null;
+                if ($pkVal === null) continue;
+
+                $ids[] = $conn->quote($pkVal);
+
+                foreach ($updateCols as $prop => $col) {
+                    $val = $row[$prop] ?? null;
+                    if ($val instanceof \DateTimeInterface) {
+                        $val = $val->format('Y-m-d H:i:s');
+                    } elseif (is_bool($val)) {
+                        $val = $val ? 1 : 0;
+                    }
+                    
+                    $quotedVal = ($val === null) ? 'NULL' : $conn->quote($val);
+                    $setClauses[$col] .= sprintf("WHEN %s THEN %s ", $conn->quote($pkVal), $quotedVal);
+                }
+            }
+
+            if (empty($ids)) continue;
+
+            $sqlSet = [];
+            foreach ($setClauses as $col => $clause) {
+                $sqlSet[] = $clause . " END";
+            }
+
+            $sql = sprintf(
+                "UPDATE %s SET %s WHERE %s IN (%s)",
+                $platform->quoteIdentifier($tableName),
+                implode(', ', $sqlSet),
+                $pkColumnQuoted,
+                implode(', ', $ids)
+            );
+
+            $totalUpdated += $conn->executeStatement($sql);
+        }
+
+        return $totalUpdated;
+    }
+
+    private function getColumnMap(ClassMetadata $metadata): array
+    {
+        $map = [];
+        foreach ($metadata->getFieldNames() as $fieldName) {
+            $map[$fieldName] = $metadata->getColumnName($fieldName);
+        }
+        return $map;
+    }
+
+    private function findExistingIds(string $entityClass, array $ids): array
+    {
+        $conn = $this->em->getConnection();
+        $metadata = $this->em->getClassMetadata($entityClass);
+        $tableName = $metadata->getTableName();
+        $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
+        $platform = $conn->getDatabasePlatform();
+
+        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (?)", 
+            $platform->quoteIdentifier($pkColumn), 
+            $platform->quoteIdentifier($tableName), 
+            $platform->quoteIdentifier($pkColumn)
+        );
+        $result = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+        
+        return $result->fetchFirstColumn();
     }
 }
