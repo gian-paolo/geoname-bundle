@@ -27,6 +27,7 @@ class InstallCommand extends Command
         'GeoAdmin2' => 'AbstractGeoAdmin2',
         'GeoAdmin3' => 'AbstractGeoAdmin3',
         'GeoAdmin4' => 'AbstractGeoAdmin4',
+        'GeoAdmin5' => 'AbstractGeoAdmin5',
         'GeoAlternateName' => 'AbstractGeoAlternateName',
         'GeoHierarchy' => 'AbstractGeoHierarchy',
     ];
@@ -122,6 +123,7 @@ pallari_geoname:
         admin2: '$namespace\GeoAdmin2'
         admin3: '$namespace\GeoAdmin3'
         admin4: '$namespace\GeoAdmin4'
+        admin5: '$namespace\GeoAdmin5'
         alternate_name: '$namespace\GeoAlternateName'
         hierarchy: '$namespace\GeoHierarchy'
 
@@ -134,6 +136,9 @@ pallari_geoname:
         enabled: true
     admin5:
         enabled: false
+
+    # Database naming
+    table_prefix: 'geoname_'
 YAML;
 
         $fs->dumpFile($configFile, $content);

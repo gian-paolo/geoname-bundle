@@ -75,9 +75,9 @@ pallari_geoname:
         enabled: true
 
     # Opzionale: Personalizza i nomi delle tabelle o aggiungi un prefisso
-    table_prefix: 'geo_'
+    table_prefix: 'geoname_'
     tables:
-        geoname: 'my_geoname' # Sovrascrive il nome della tabella geoname (il prefisso verrà aggiunto se impostato)
+        geoname: 'geoname' # Risulterà in 'geoname_geoname'
 ```
 
 ### Setup delle Entità (Azione Richiesta)

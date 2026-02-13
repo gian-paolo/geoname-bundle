@@ -13,6 +13,7 @@ services:
             $admin2Table: '%pallari_geoname.tables.admin2%'
             $admin3Table: '%pallari_geoname.tables.admin3%'
             $admin4Table: '%pallari_geoname.tables.admin4%'
+            $admin5Table: '%pallari_geoname.tables.admin5%'
             $useFulltext: '%pallari_geoname.search.use_fulltext%'
 
     Pallari\GeonameBundle\Service\GeonameHierarchyService:
@@ -46,6 +47,7 @@ services:
                 adm2: '%pallari_geoname.tables.admin2%'
                 adm3: '%pallari_geoname.tables.admin3%'
                 adm4: '%pallari_geoname.tables.admin4%'
+                adm5: '%pallari_geoname.tables.admin5%'
         tags: ['console.command']
 
     Pallari\GeonameBundle\Command\InstallCommand:

@@ -362,6 +362,7 @@ class GeonameImporter
             'ADM2' => [],
             'ADM3' => [],
             'ADM4' => [],
+            'ADM5' => [],
         ];
 
         foreach ($batch as $data) {
@@ -377,6 +378,9 @@ class GeonameImporter
                 $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'];
             } elseif ($fCode === 'ADM4') {
                 $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'] . '.' . $data['admin4Code'];
+            } elseif ($fCode === 'ADM5') {
+                // For ADM5, use admin5_code if available, otherwise fallback (Admin5 codes are less standardized)
+                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'] . '.' . $data['admin4Code'] . '.' . ($data['admin5Code'] ?? $data['id']);
             }
 
             $adminData[$fCode][] = [

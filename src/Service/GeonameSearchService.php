@@ -14,6 +14,7 @@ class GeonameSearchService
         private readonly string $admin2Table,
         private readonly string $admin3Table,
         private readonly string $admin4Table,
+        private readonly string $admin5Table,
         private readonly bool $useFulltext = false
     ) {}
 

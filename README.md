@@ -77,9 +77,9 @@ pallari_geoname:
         enabled: true
 
     # Optional: Customize table names or add a prefix
-    table_prefix: 'geo_'
+    table_prefix: 'geoname_'
     tables:
-        geoname: 'my_geoname' # Overrides geoname table name (prefix will be added if set)
+        geoname: 'geoname' # Table will be 'geoname_geoname'
 ```
 
 ### Entity Setup (Action Required)
