@@ -63,6 +63,7 @@ pallari_geoname:
         admin2: 'App\Entity\GeoAdmin2'      # Province names
         admin3: 'App\Entity\GeoAdmin3'      # Municipality names (e.g. Comuni)
         admin4: 'App\Entity\GeoAdmin4'      # Local district names
+        admin5: 'App\Entity\GeoAdmin5'      # Local neighborhood names
     
     # Enable alternate names sync
     alternate_names:
@@ -98,6 +99,7 @@ Create these files in `src/Entity/`. Each class must extend the corresponding ab
 | `GeoAdmin2.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin2` |
 | `GeoAdmin3.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin3` |
 | `GeoAdmin4.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin4` |
+| `GeoAdmin5.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin5` |
 | `GeoAlternateName.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAlternateName` |
 | `GeoHierarchy.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoHierarchy` |
 
