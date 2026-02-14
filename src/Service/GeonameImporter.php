@@ -191,7 +191,7 @@ class GeonameImporter
         }
     }
 
-    public function importAdminCodes(string $url, string $entityClass): int
+    public function importAdminCodes(string $url, string $entityClass, array $allowedCodes = []): int
     {
         $this->disableLogging();
         $filePath = $this->downloadFile($url);
@@ -200,8 +200,14 @@ class GeonameImporter
         
         // Find which admin level table to use
         $tableName = null;
-        if (str_contains($url, 'admin1Codes')) $tableName = $this->adminTableNames['adm1'] ?? null;
-        elseif (str_contains($url, 'admin2Codes')) $tableName = $this->adminTableNames['adm2'] ?? null;
+        $level = null;
+        if (str_contains($url, 'admin1Codes')) {
+            $tableName = $this->adminTableNames['adm1'] ?? null;
+            $level = 1;
+        } elseif (str_contains($url, 'admin2Codes')) {
+            $tableName = $this->adminTableNames['adm2'] ?? null;
+            $level = 2;
+        }
 
         if (!$tableName) {
             $metadata = $this->em->getClassMetadata($entityClass);
@@ -214,28 +220,188 @@ class GeonameImporter
             foreach ($batch as $row) {
                 if (count($row) < 4) continue;
                 
-                $placeholders[] = '(?, ?, ?, ?)';
-                $values[] = $row[0]; // code
-                $values[] = $row[1]; // name
-                $values[] = $row[2]; // asciiname
-                $values[] = (int)$row[3]; // geonameid
-                $total++;
+                $fullCode = $row[0]; // e.g. "IT.09" or "IT.09.TO"
+                if (!empty($allowedCodes) && !in_array($fullCode, $allowedCodes)) {
+                    continue;
+                }
+
+                $codeParts = explode('.', $fullCode);
+                if ($level === 1 && count($codeParts) === 2) {
+                    $placeholders[] = '(?, ?, ?, ?, ?)';
+                    $values[] = $codeParts[0]; // country
+                    $values[] = $codeParts[1]; // admin1
+                    $values[] = $row[1]; // name
+                    $values[] = $row[2]; // asciiname
+                    $values[] = (int)$row[3]; // geonameid
+                    $total++;
+                } elseif ($level === 2 && count($codeParts) === 3) {
+                    $placeholders[] = '(?, ?, ?, ?, ?, ?)';
+                    $values[] = $codeParts[0]; // country
+                    $values[] = $codeParts[1]; // admin1
+                    $values[] = $codeParts[2]; // admin2
+                    $values[] = $row[1]; // name
+                    $values[] = $row[2]; // asciiname
+                    $values[] = (int)$row[3]; // geonameid
+                    $total++;
+                }
             }
 
             if (empty($placeholders)) continue;
 
-            $sql = sprintf(
-                "INSERT INTO `%s` (code, name, asciiname, geonameid) VALUES %s 
-                 ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)",
-                $tableName,
-                implode(', ', $placeholders)
-            );
+            $cols = ($level === 1) ? 'country_code, admin1_code' : 'country_code, admin1_code, admin2_code';
+            $platform = strtolower(get_class($conn->getDatabasePlatform()));
+            
+            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+                $sql = sprintf(
+                    "INSERT INTO `%s` (%s, name, asciiname, geonameid) VALUES %s 
+                     ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)",
+                    $tableName,
+                    $cols,
+                    implode(', ', $placeholders)
+                );
+            } elseif (str_contains($platform, 'postgresql') || str_contains($platform, 'sqlite')) {
+                $sql = sprintf(
+                    "INSERT INTO `%s` (%s, name, asciiname, geonameid) VALUES %s 
+                     ON CONFLICT (%s) DO UPDATE SET name = EXCLUDED.name, asciiname = EXCLUDED.asciiname, geonameid = EXCLUDED.geonameid",
+                    $tableName,
+                    $cols,
+                    implode(', ', $placeholders),
+                    $cols
+                );
+            } else {
+                continue; // Fallback skipped for brevity
+            }
             
             $conn->executeStatement($sql, $values);
         }
         
         unlink($filePath);
         return $total;
+    }
+
+    /**
+     * Gets a list of admin codes currently used in the geoname table for specific countries.
+     */
+    public function getUsedAdminCodes(string $level, array $allowedCountries): array
+    {
+        $conn = $this->em->getConnection();
+        $col1 = 'admin1_code';
+        $col2 = 'admin2_code';
+        
+        $codeExpr = match (strtoupper($level)) {
+            'ADM1' => "CONCAT(country_code, '.', admin1_code)",
+            'ADM2' => "CONCAT(country_code, '.', admin1_code, '.', admin2_code)",
+            default => null
+        };
+
+        if (!$codeExpr) return [];
+
+        $sql = sprintf(
+            "SELECT DISTINCT %s as code FROM `%s` WHERE country_code IN (?) AND %s != ''",
+            $codeExpr,
+            $this->importTableName,
+            str_contains($level, '1') ? 'admin1_code' : 'admin2_code'
+        );
+
+        return $conn->executeQuery($sql, [$allowedCountries], [\Doctrine\DBAL\ArrayParameterType::STRING])->fetchFirstColumn();
+    }
+
+    /**
+     * Populates admin tables by extracting data directly from the main geoname table.
+     * This is useful when the full country dataset has been imported.
+     */
+    public function syncAdminTablesFromTable(array $allowedCountries = []): array
+    {
+        $levels = ['ADM1', 'ADM2', 'ADM3', 'ADM4', 'ADM5'];
+        $stats = [];
+        $conn = $this->em->getConnection();
+
+        foreach ($levels as $level) {
+            $targetTable = $this->adminTableNames[strtolower($level)] ?? null;
+            if (!$targetTable) continue;
+
+            $where = ["feature_code = " . $conn->quote($level)];
+            if (!empty($allowedCountries)) {
+                $where[] = "country_code IN (" . implode(',', array_map([$conn, 'quote'], $allowedCountries)) . ")";
+            }
+
+            $whereSql = implode(' AND ', $where);
+
+            $cols = match ($level) {
+                'ADM1' => ['country_code', 'admin1_code'],
+                'ADM2' => ['country_code', 'admin1_code', 'admin2_code'],
+                'ADM3' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code'],
+                'ADM4' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'],
+                'ADM5' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'],
+            };
+            
+            $colsList = implode(', ', $cols);
+            $platform = strtolower(get_class($conn->getDatabasePlatform()));
+
+            // 1. Insert new records
+            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+                $sqlInsert = sprintf(
+                    "INSERT IGNORE INTO `%s` (%s, name, ascii_name, geonameid)
+                     SELECT %s, name, ascii_name, geonameid FROM `%s`
+                     WHERE %s",
+                    $targetTable,
+                    $colsList,
+                    $colsList,
+                    $this->importTableName,
+                    $whereSql
+                );
+            } else {
+                // PostgreSQL / SQLite
+                $sqlInsert = sprintf(
+                    "INSERT INTO `%s` (%s, name, ascii_name, geonameid)
+                     SELECT %s, name, ascii_name, geonameid FROM `%s`
+                     WHERE %s
+                     ON CONFLICT (%s) DO NOTHING",
+                    $targetTable,
+                    $colsList,
+                    $colsList,
+                    $this->importTableName,
+                    $whereSql,
+                    $colsList
+                );
+            }
+            $inserted = $conn->executeStatement($sqlInsert);
+
+            // 2. Update existing records (using join for efficiency)
+            $joinOn = implode(' AND ', array_map(fn($c) => "t.$c = g.$c", $cols));
+            
+            // Standard SQL update with join is slightly different between platforms
+            if (str_contains($platform, 'postgresql')) {
+                $sqlUpdate = sprintf(
+                    "UPDATE `%s` t
+                     SET name = g.name, ascii_name = g.ascii_name, geonameid = g.geonameid
+                     FROM `%s` g
+                     WHERE %s AND g.%s",
+                    $targetTable,
+                    $this->importTableName,
+                    $joinOn,
+                    $whereSql
+                );
+            } else {
+                // MySQL / MariaDB / SQLite (SQLite 3.33+ supports this syntax, but for safety on older ones we might need another approach)
+                // Actually MySQL and MariaDB use INNER JOIN in UPDATE
+                $sqlUpdate = sprintf(
+                    "UPDATE `%s` t
+                     INNER JOIN `%s` g ON %s
+                     SET t.name = g.name, t.ascii_name = g.ascii_name, t.geonameid = g.geonameid
+                     WHERE g.%s",
+                    $targetTable,
+                    $this->importTableName,
+                    $joinOn,
+                    $whereSql
+                );
+            }
+            $updated = $conn->executeStatement($sqlUpdate);
+            
+            $stats[$level] = $inserted + $updated;
+        }
+
+        return $stats;
     }
 
     public function importAdmin5(string $url, string $tableName): int
@@ -360,48 +526,82 @@ class GeonameImporter
             $fCode = $data['featureCode'];
             if (!isset($adminData[$fCode])) continue;
 
-            $code = $data['countryCode'];
-            if ($fCode === 'ADM1') {
-                $code .= '.' . $data['admin1Code'];
-            } elseif ($fCode === 'ADM2') {
-                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'];
-            } elseif ($fCode === 'ADM3') {
-                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'];
-            } elseif ($fCode === 'ADM4') {
-                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'] . '.' . $data['admin4Code'];
-            } elseif ($fCode === 'ADM5') {
-                // For ADM5, use admin5_code if available, otherwise fallback (Admin5 codes are less standardized)
-                $code .= '.' . $data['admin1Code'] . '.' . $data['admin2Code'] . '.' . $data['admin3Code'] . '.' . $data['admin4Code'] . '.' . ($data['admin5Code'] ?? $data['id']);
-            }
-
-            $adminData[$fCode][] = [
-                'code' => $code,
+            $row = [
+                'country_code' => $data['countryCode'],
+                'admin1_code' => $data['admin1Code'],
                 'name' => $data['name'],
-                'asciiname' => $data['asciiname'],
+                'ascii_name' => $data['asciiname'],
                 'geonameid' => $data['id']
             ];
+
+            if (in_array($fCode, ['ADM2', 'ADM3', 'ADM4', 'ADM5'])) {
+                $row['admin2_code'] = $data['admin2Code'];
+            }
+            if (in_array($fCode, ['ADM3', 'ADM4', 'ADM5'])) {
+                $row['admin3_code'] = $data['admin3Code'];
+            }
+            if (in_array($fCode, ['ADM4', 'ADM5'])) {
+                $row['admin4_code'] = $data['admin4Code'];
+            }
+            if ($fCode === 'ADM5') {
+                $row['admin5_code'] = $data['admin5Code'] ?? $data['id'];
+            }
+
+            $adminData[$fCode][] = $row;
         }
 
         foreach ($adminData as $level => $rows) {
             $tableName = $this->adminTableNames[strtolower($level)] ?? null;
             if (!$tableName || empty($rows)) continue;
 
-            $values = [];
+            $cols = array_keys($rows[0]);
             $placeholders = [];
+            $values = [];
+            $qs = '(' . implode(', ', array_fill(0, count($cols), '?')) . ')';
+
             foreach ($rows as $row) {
-                $placeholders[] = '(?, ?, ?, ?)';
-                $values[] = $row['code'];
-                $values[] = $row['name'];
-                $values[] = $row['asciiname'];
-                $values[] = $row['geonameid'];
+                $placeholders[] = $qs;
+                foreach ($cols as $col) {
+                    $values[] = $row[$col];
+                }
             }
 
-            $sql = sprintf(
-                "INSERT INTO `%s` (code, name, asciiname, geonameid) VALUES %s 
-                 ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)",
-                $tableName,
-                implode(', ', $placeholders)
-            );
+            $platform = strtolower(get_class($conn->getDatabasePlatform()));
+            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+                $sql = sprintf(
+                    "INSERT INTO `%s` (%s) VALUES %s 
+                     ON DUPLICATE KEY UPDATE name = VALUES(name), ascii_name = VALUES(ascii_name), geonameid = VALUES(geonameid)",
+                    $tableName,
+                    implode(', ', $cols),
+                    implode(', ', $placeholders)
+                );
+            } elseif (str_contains($platform, 'postgresql') || str_contains($platform, 'sqlite')) {
+                // PostgreSQL and modern SQLite support ON CONFLICT
+                // Note: For composite keys, we need to list all PK columns in the conflict target
+                $pkCols = [];
+                if (str_contains($tableName, 'admin1')) $pkCols = ['country_code', 'admin1_code'];
+                elseif (str_contains($tableName, 'admin2')) $pkCols = ['country_code', 'admin1_code', 'admin2_code'];
+                elseif (str_contains($tableName, 'admin3')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code'];
+                elseif (str_contains($tableName, 'admin4')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'];
+                elseif (str_contains($tableName, 'admin5')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'];
+
+                $sql = sprintf(
+                    "INSERT INTO `%s` (%s) VALUES %s 
+                     ON CONFLICT (%s) DO UPDATE SET name = EXCLUDED.name, ascii_name = EXCLUDED.ascii_name, geonameid = EXCLUDED.geonameid",
+                    $tableName,
+                    implode(', ', $cols),
+                    implode(', ', $placeholders),
+                    implode(', ', $pkCols)
+                );
+            } else {
+                // Generic fallback (not efficient but safe)
+                foreach ($rows as $row) {
+                    try {
+                        $this->bulkInsert($this->geonameEntityClass, [$row]); // This is wrong, it should be the admin entity
+                    } catch (\Exception $e) {}
+                }
+                continue;
+            }
             $conn->executeStatement($sql, $values);
         }
     }

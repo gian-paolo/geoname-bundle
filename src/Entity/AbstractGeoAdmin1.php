@@ -8,20 +8,26 @@ use Doctrine\ORM\Mapping as ORM;
 abstract class AbstractGeoAdmin1
 {
     #[ORM\Id]
-    #[ORM\Column(length: 20)]
-    protected ?string $code = null; // e.g., IT.09
+    #[ORM\Column(name: 'country_code', length: 2, options: ['fixed' => true, 'charset' => 'ascii'])]
+    protected ?string $countryCode = null;
+
+    #[ORM\Id]
+    #[ORM\Column(name: 'admin1_code', length: 20, options: ['charset' => 'ascii'])]
+    protected ?string $admin1Code = null;
 
     #[ORM\Column(length: 200)]
     protected ?string $name = null;
 
-    #[ORM\Column(length: 200, nullable: true)]
+    #[ORM\Column(name: 'ascii_name', length: 200, nullable: true, options: ['charset' => 'ascii'])]
     protected ?string $asciiname = null;
 
     #[ORM\Column(name: 'geonameid', type: 'integer', nullable: true)]
     protected ?int $geonameId = null;
 
-    public function getCode(): ?string { return $this->code; }
-    public function setCode(string $code): self { $this->code = $code; return $this; }
+    public function getCountryCode(): ?string { return $this->countryCode; }
+    public function setCountryCode(string $countryCode): self { $this->countryCode = $countryCode; return $this; }
+    public function getAdmin1Code(): ?string { return $this->admin1Code; }
+    public function setAdmin1Code(string $admin1Code): self { $this->admin1Code = $admin1Code; return $this; }
     public function getName(): ?string { return $this->name; }
     public function setName(string $name): self { $this->name = $name; return $this; }
     public function getGeonameId(): ?int { return $this->geonameId; }

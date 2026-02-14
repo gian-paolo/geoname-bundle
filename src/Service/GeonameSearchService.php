@@ -4,6 +4,7 @@ namespace Pallari\GeonameBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
+use Doctrine\DBAL\ArrayParameterType;
 
 class GeonameSearchService
 {
@@ -36,7 +37,7 @@ class GeonameSearchService
         }
 
         $qb = $this->connection->createQueryBuilder();
-        $platform = $this->connection->getDatabasePlatform()->getName();
+        $platformClass = strtolower(get_class($this->connection->getDatabasePlatform()));
         
         // Base selection
         $qb->select('g.geonameid', 'g.name', 'g.ascii_name', 'g.country_code', 'g.latitude', 'g.longitude', 'g.population', 'g.feature_code', 'g.admin5_code');
@@ -45,11 +46,11 @@ class GeonameSearchService
 
         // Text search strategy
         if ($this->useFulltext) {
-            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 // MySQL/MariaDB Full-Text Search
                 $qb->andWhere('MATCH(g.name, g.ascii_name, g.alternate_names) AGAINST(:term IN BOOLEAN MODE)');
                 $qb->setParameter('term', $term . '*');
-            } elseif (str_contains($platform, 'postgresql')) {
+            } elseif (str_contains($platformClass, 'postgresql')) {
                 // PostgreSQL Full-Text Search (simple configuration for multi-language)
                 $qb->andWhere("to_tsvector('simple', g.name || ' ' || g.ascii_name || ' ' || g.alternate_names) @@ to_tsquery('simple', :term)");
                 $qb->setParameter('term', $term . ':*');
@@ -69,31 +70,36 @@ class GeonameSearchService
                           'a4.name as admin4_name', 'a4.geonameid as admin4_id',
                           'a5.name as admin5_name', 'a5.geonameid as admin5_id');
             
-            // Join Admin1 (Region) - Key format is CC.ADM1
-            $qb->leftJoin('g', $this->admin1Table, 'a1', 'a1.code = CONCAT(g.country_code, \'.\', g.admin1_code)');
+            // Join Admin1 (Region)
+            $qb->leftJoin('g', $this->admin1Table, 'a1', 
+                'a1.country_code = g.country_code AND a1.admin1_code = g.admin1_code');
             
-            // Join Admin2 (Province) - Key format is CC.ADM1.ADM2
-            $qb->leftJoin('g', $this->admin2Table, 'a2', 'a2.code = CONCAT(g.country_code, \'.\', g.admin1_code, \'.\', g.admin2_code)');
+            // Join Admin2 (Province)
+            $qb->leftJoin('g', $this->admin2Table, 'a2', 
+                'a2.country_code = g.country_code AND a2.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code');
 
-            // Join Admin3 (Municipality/Comune) - Key format is CC.ADM1.ADM2.ADM3
-            $qb->leftJoin('g', $this->admin3Table, 'a3', 'a3.code = CONCAT(g.country_code, \'.\', g.admin1_code, \'.\', g.admin2_code, \'.\', g.admin3_code)');
+            // Join Admin3 (Municipality/Comune)
+            $qb->leftJoin('g', $this->admin3Table, 'a3', 
+                'a3.country_code = g.country_code AND a3.admin1_code = g.admin1_code AND a3.admin2_code = g.admin2_code AND a3.admin3_code = g.admin3_code');
 
-            // Join Admin4 - Key format is CC.ADM1.ADM2.ADM3.ADM4
-            $qb->leftJoin('g', $this->admin4Table, 'a4', 'a4.code = CONCAT(g.country_code, \'.\', g.admin1_code, \'.\', g.admin2_code, \'.\', g.admin3_code, \'.\', g.admin4_code)');
+            // Join Admin4
+            $qb->leftJoin('g', $this->admin4Table, 'a4', 
+                'a4.country_code = g.country_code AND a4.admin1_code = g.admin1_code AND a4.admin2_code = g.admin2_code AND a4.admin3_code = g.admin3_code AND a4.admin4_code = g.admin4_code');
 
-            // Join Admin5 - Key format is CC.ADM1.ADM2.ADM3.ADM4.ADM5
-            $qb->leftJoin('g', $this->admin5Table, 'a5', 'a5.code = CONCAT(g.country_code, \'.\', g.admin1_code, \'.\', g.admin2_code, \'.\', g.admin3_code, \'.\', g.admin4_code, \'.\', g.admin5_code)');
+            // Join Admin5
+            $qb->leftJoin('g', $this->admin5Table, 'a5', 
+                'a5.country_code = g.country_code AND a5.admin1_code = g.admin1_code AND a5.admin2_code = g.admin2_code AND a5.admin3_code = g.admin3_code AND a5.admin4_code = g.admin4_code AND a5.admin5_code = g.admin5_code');
         }
 
         // Filters
         if (!empty($options['countries'])) {
             $qb->andWhere('g.country_code IN (:countries)')
-               ->setParameter('countries', $options['countries'], Connection::PARAM_STR_ARRAY);
+               ->setParameter('countries', $options['countries'], ArrayParameterType::STRING);
         }
 
         if (!empty($options['feature_classes'])) {
             $qb->andWhere('g.feature_class IN (:fclasses)')
-               ->setParameter('fclasses', $options['feature_classes'], Connection::PARAM_STR_ARRAY);
+               ->setParameter('fclasses', $options['feature_classes'], ArrayParameterType::STRING);
         }
 
         if (isset($options['min_population'])) {

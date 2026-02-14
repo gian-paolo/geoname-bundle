@@ -30,24 +30,22 @@ services:
         calls:
             - [setEntityClasses, ['%pallari_geoname.entities.geoname%', '%pallari_geoname.entities.import%', '%pallari_geoname.entities.alternate_name%']]
             - [setTableNames, ['%pallari_geoname.tables.import%', '%pallari_geoname.tables.hierarchy%', '%pallari_geoname.tables.alternate_name%']]
+            - [setAdminTableNames, [{
+                adm1: '%pallari_geoname.tables.admin1%',
+                adm2: '%pallari_geoname.tables.admin2%',
+                adm3: '%pallari_geoname.tables.admin3%',
+                adm4: '%pallari_geoname.tables.admin4%',
+                adm5: '%pallari_geoname.tables.admin5%'
+              }]]
 
     Pallari\GeonameBundle\Command\SyncGeonameCommand:
         arguments:
             $em: '@doctrine.orm.entity_manager'
-            $geonameEntityClass: '%pallari_geoname.entities.geoname%'
-            $importEntityClass: '%pallari_geoname.entities.import%'
             $countryEntityClass: '%pallari_geoname.entities.country%'
             $languageEntityClass: '%pallari_geoname.entities.language%'
-            $alternateNameEntityClass: '%pallari_geoname.entities.alternate_name%'
             $alternateNamesEnabled: '%pallari_geoname.alternate_names.enabled%'
             $admin5Enabled: '%pallari_geoname.admin5.enabled%'
             $geonameTable: '%pallari_geoname.tables.geoname%'
-            $adminTables:
-                adm1: '%pallari_geoname.tables.admin1%'
-                adm2: '%pallari_geoname.tables.admin2%'
-                adm3: '%pallari_geoname.tables.admin3%'
-                adm4: '%pallari_geoname.tables.admin4%'
-                adm5: '%pallari_geoname.tables.admin5%'
         tags: ['console.command']
 
     Pallari\GeonameBundle\Command\InstallCommand:
@@ -60,6 +58,8 @@ services:
 
     Pallari\GeonameBundle\Command\ImportAdminCodesCommand:
         arguments:
+            $em: '@doctrine.orm.entity_manager'
+            $countryEntityClass: '%pallari_geoname.entities.country%'
             $admin1EntityClass: '%pallari_geoname.entities.admin1%'
             $admin2EntityClass: '%pallari_geoname.entities.admin2%'
         tags: ['console.command']

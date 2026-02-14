@@ -18,6 +18,8 @@ Unlike other bundles, it is designed to handle **millions of records** with mini
 - **Interactive Installer**: Complete setup in seconds with `pallari:geoname:install`.
 - **Smart Synchronization**: Downloads and applies only daily changes and deletions from GeoNames.
 - **Bulk SQL Performance**: Uses optimized SQL queries (`bulkInsert` and `bulkUpdate`), reducing the number of queries by 99%.
+- **Composite Hierarchy**: Uses composite primary keys for administrative levels (Admin1-5) for ultra-fast joins without redundancy.
+- **ASCII Optimized**: Uses native ASCII character sets for codes and normalized names, reducing index size and increasing comparison speed.
 - **Hybrid Strategy**: Automatically splits data between "new" and "existing" for transparent and safe management.
 - **Configurable Detail**: Choose full detail for specific countries (e.g., Italy) and only major cities for the rest of the world.
 - **Multilingual**: Optional support for alternate names (translations).

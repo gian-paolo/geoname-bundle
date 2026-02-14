@@ -16,6 +16,8 @@ A differenza di altri bundle, questo è progettato per gestire **milioni di reco
 - **Installatore Interattivo**: Configurazione completa in pochi secondi con `pallari:geoname:install`.
 - **Sincronizzazione Intelligente**: Scarica e applica solo le modifiche e le eliminazioni giornaliere di GeoNames.
 - **Performance SQL Bulk**: Utilizza query SQL ottimizzate (`bulkInsert` e `bulkUpdate`) riducendo il numero di query del 99%.
+- **Gerarchia Composta**: Utilizza chiavi primarie composte per i livelli amministrativi (Admin1-5) per join ultra-rapidi senza ridondanza.
+- **Ottimizzazione ASCII**: Utilizza set di caratteri ASCII nativi per codici e nomi normalizzati, riducendo la dimensione degli indici e aumentando la velocità di confronto.
 - **Strategia Ibrida**: Divide automaticamente i dati tra "nuovi" e "esistenti" per una gestione trasparente e sicura.
 - **Dettaglio Configurabile**: Puoi scegliere di avere il dettaglio completo per certi paesi (es. Italia) e solo le città principali per il resto del mondo.
 - **Multilingua**: Supporto opzionale per i nomi alternativi (traduzioni).
@@ -206,8 +208,8 @@ Come unire le tabelle per ottenere un indirizzo completo:
 ```sql
 SELECT c.name as citta, a1.name as regione, a2.name as provincia
 FROM geo_name c
-LEFT JOIN geo_admin1 a1 ON a1.code = CONCAT(c.country_code, '.', c.admin1_code)
-LEFT JOIN geo_admin2 a2 ON a2.code = CONCAT(c.country_code, '.', c.admin1_code, '.', c.admin2_code)
+LEFT JOIN geo_admin1 a1 ON a1.country_code = c.country_code AND a1.admin1_code = c.admin1_code
+LEFT JOIN geo_admin2 a2 ON a2.country_code = c.country_code AND a2.admin1_code = c.admin1_code AND a2.admin2_code = c.admin2_code
 WHERE c.name LIKE 'Torino%' AND c.is_deleted = 0;
 ```
 

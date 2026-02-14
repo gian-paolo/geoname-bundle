@@ -26,19 +26,13 @@ class SyncGeonameCommand extends Command
     public function __construct(
         private EntityManagerInterface $em,
         private GeonameImporter $importer,
-        string $geonameEntityClass = 'App\Entity\GeoName',
-        string $importEntityClass = 'App\Entity\GeoImport',
         string $countryEntityClass = 'App\Entity\GeoCountry',
         string $languageEntityClass = 'App\Entity\GeoLanguage',
-        string $alternateNameEntityClass = 'App\Entity\GeoAlternateName',
         bool $alternateNamesEnabled = false,
         bool $admin5Enabled = false,
-        string $geonameTable = 'geoname',
-        array $adminTables = []
+        string $geonameTable = 'geoname'
     ) {
         parent::__construct();
-        $this->importer->setEntityClasses($geonameEntityClass, $importEntityClass, $alternateNameEntityClass);
-        $this->importer->setAdminTableNames($adminTables);
         $this->countryEntityClass = $countryEntityClass;
         $this->languageEntityClass = $languageEntityClass;
         $this->alternateNamesEnabled = $alternateNamesEnabled;
