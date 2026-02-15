@@ -332,9 +332,9 @@ class GeonameImporter
             $targetTable = $this->adminTableNames[strtolower($level)] ?? null;
             if (!$targetTable) continue;
 
-            $where = ["feature_code = " . $conn->quote($level)];
+            $where = ["g.feature_code = " . $conn->quote($level)];
             if (!empty($allowedCountries)) {
-                $where[] = "country_code IN (" . implode(',', array_map([$conn, 'quote'], $allowedCountries)) . ")";
+                $where[] = "g.country_code IN (" . implode(',', array_map([$conn, 'quote'], $allowedCountries)) . ")";
             }
 
             $whereSql = implode(' AND ', $where);
@@ -356,17 +356,21 @@ class GeonameImporter
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $sqlInsert = sprintf(
                     "INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid)
-                     SELECT DISTINCT %s, name, ascii_name, geonameid FROM %s
+                     SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g
                      WHERE %s",
-                    $targetTableQuoted, $colsList, $colsList, $importTableQuoted, $whereSql
+                    $targetTableQuoted, $colsList, 
+                    implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)),
+                    $importTableQuoted, $whereSql
                 );
             } else {
                 $sqlInsert = sprintf(
                     "INSERT INTO %s (%s, name, ascii_name, geonameid)
-                     SELECT DISTINCT %s, name, ascii_name, geonameid FROM %s
+                     SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g
                      WHERE %s
                      ON CONFLICT (%s) DO NOTHING",
-                    $targetTableQuoted, $colsList, $colsList, $importTableQuoted, $whereSql, $colsList
+                    $targetTableQuoted, $colsList,
+                    implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)),
+                    $importTableQuoted, $whereSql, $colsList
                 );
             }
             $inserted = $conn->executeStatement($sqlInsert);
