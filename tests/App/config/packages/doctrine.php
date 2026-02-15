@@ -16,19 +16,24 @@ return static function (ContainerConfigurator $container): void {
         ],
     ];
 
-    // Detect if we are on Doctrine ORM 3
-    $isOrm3 = !method_exists(\Doctrine\ORM\Configuration::class, 'getAutoGenerateProxyClasses');
+    // Detect Doctrine ORM version safely
+    $isOrm2 = method_exists(\Doctrine\ORM\Configuration::class, 'getAutoGenerateProxyClasses');
+    
+    // Detect Doctrine Bundle version
+    // enable_lazy_ghost_objects was added in 2.12
+    $hasGhostObjectsOption = class_exists(\Doctrine\Bundle\DoctrineBundle\Controller\ArgumentResolver\EntityValueResolver::class);
 
-    if ($isOrm3) {
-        // In ORM 3, many legacy options are gone and handled by DoctrineBundle
+    if (!$isOrm2) {
+        // ORM 3: Many legacy options are gone
         $ormConfig['controller_resolver'] = ['auto_mapping' => false];
-        // We explicitly avoid any 'enable_lazy_ghost_objects' here
     } else {
-        // ORM 2 specific safe settings
+        // ORM 2
         $ormConfig['auto_generate_proxy_classes'] = true;
-        // This is the key: we explicitly set it to false to avoid the internal call 
-        // to enableNativeLazyObjects in some versions of DoctrineBundle
-        $ormConfig['enable_lazy_ghost_objects'] = false;
+        if ($hasGhostObjectsOption) {
+            // We enable it ONLY if we are on ORM 2 and the bundle supports it.
+            // On ORM 3 it's mandatory and cannot be disabled.
+            $ormConfig['enable_lazy_ghost_objects'] = true;
+        }
     }
 
     $container->extension('doctrine', [
