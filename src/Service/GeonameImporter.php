@@ -13,6 +13,7 @@ class GeonameImporter
     private string $geonameEntityClass;
     private string $importEntityClass;
     private string $alternateNameEntityClass;
+    private string $geonameTableName;
     private string $importTableName;
     private string $hierarchyTableName = 'geohierarchy';
     private string $alternateNameTableName = 'geoalternatename';
@@ -37,8 +38,9 @@ class GeonameImporter
         $this->adminTableNames = $tables;
     }
 
-    public function setTableNames(string $importTableName, string $hierarchyTableName = 'geohierarchy', string $alternateNameTableName = 'geoalternatename'): void
+    public function setTableNames(string $geonameTableName, string $importTableName, string $hierarchyTableName = 'geohierarchy', string $alternateNameTableName = 'geoalternatename'): void
     {
+        $this->geonameTableName = $geonameTableName;
         $this->importTableName = $importTableName;
         $this->hierarchyTableName = $hierarchyTableName;
         $this->alternateNameTableName = $alternateNameTableName;
@@ -348,7 +350,7 @@ class GeonameImporter
             $colsQuoted = array_map(fn($c) => $platform->quoteIdentifier($c), $cols);
             $colsList = implode(', ', $colsQuoted);
             $targetTableQuoted = $platform->quoteIdentifier($targetTable);
-            $importTableQuoted = $platform->quoteIdentifier($this->importTableName);
+            $importTableQuoted = $platform->quoteIdentifier($this->geonameTableName);
 
             // 1. Insert new records
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
