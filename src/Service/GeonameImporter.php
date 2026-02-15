@@ -527,7 +527,7 @@ class GeonameImporter
                 'country_code' => $data['countryCode'],
                 'admin1_code' => $data['admin1Code'],
                 'name' => $data['name'],
-                'ascii_name' => $data['asciiname'],
+                'ascii_name' => $data['ascii_name'],
                 'geonameid' => $data['id']
             ];
 

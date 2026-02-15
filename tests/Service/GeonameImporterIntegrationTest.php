@@ -18,7 +18,8 @@ class GeonameImporterIntegrationTest extends KernelTestCase
         $em = $container->get('doctrine.orm.entity_manager');
         $metadatas = $em->getMetadataFactory()->getAllMetadata();
         $schemaTool = new \Doctrine\ORM\Tools\SchemaTool($em);
-        $schemaTool->updateSchema($metadatas);
+        $schemaTool->dropSchema($metadatas);
+        $schemaTool->createSchema($metadatas);
     }
 
     public function testImportAdminCodesSplitting(): void
