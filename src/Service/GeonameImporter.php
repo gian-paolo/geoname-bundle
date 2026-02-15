@@ -527,7 +527,7 @@ class GeonameImporter
                 'country_code' => $data['countryCode'],
                 'admin1_code' => $data['admin1Code'],
                 'name' => $data['name'],
-                'ascii_name' => $data['ascii_name'],
+                'ascii_name' => $data['asciiName'],
                 'geonameid' => $data['id']
             ];
 
@@ -651,7 +651,7 @@ class GeonameImporter
         return [
             'id' => (int)$row[0],
             'name' => substr($row[1], 0, 200),
-            'ascii_name' => substr($row[2], 0, 200),
+            'asciiName' => substr($row[2], 0, 200),
             'alternatenames' => substr($row[3], 0, 10000),
             'latitude' => (float)$row[4],
             'longitude' => (float)$row[5],

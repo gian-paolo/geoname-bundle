@@ -17,7 +17,7 @@ abstract class AbstractGeoName
     protected ?string $name = null;
 
     #[ORM\Column(name: 'ascii_name', length: 200, options: ['charset' => 'ascii'])]
-    protected ?string $asciiname = null;
+    protected ?string $asciiName = null;
 
     #[ORM\Column(name: 'alternate_names', type: Types::TEXT, length: 10000, nullable: true)]
     protected ?string $alternatenames = null;
@@ -74,8 +74,8 @@ abstract class AbstractGeoName
 
     public function getName(): ?string { return $this->name; }
     public function setName(?string $name): self { $this->name = $name; return $this; }
-    public function getAsciiname(): ?string { return $this->asciiname; }
-    public function setAsciiname(?string $asciiname): self { $this->asciiname = $asciiname; return $this; }
+    public function getAsciiName(): ?string { return $this->asciiName; }
+    public function setAsciiName(?string $asciiName): self { $this->asciiName = $asciiName; return $this; }
     public function getLatitude(): ?float { return $this->latitude; }
     public function setLatitude(?float $latitude): self { $this->latitude = $latitude; return $this; }
     public function getLongitude(): ?float { return $this->longitude; }

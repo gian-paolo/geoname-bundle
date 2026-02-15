@@ -47,7 +47,7 @@ IT.10	Puglia	Apulia	3170588
             [
                 'id' => 3169070,
                 'name' => 'Roma',
-                'ascii_name' => 'Roma',
+                'asciiName' => 'Roma',
                 'countryCode' => 'IT',
                 'admin1Code' => '07',
                 'admin2Code' => 'RM',

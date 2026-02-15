@@ -47,7 +47,7 @@ class GeonameSearchIntegrationTest extends KernelTestCase
         $city = new GeoName();
         $city->setId(3165524);
         $city->setName('Torino');
-        $city->setAsciiname('Torino');
+        $city->setAsciiName('Torino');
         $city->setCountryCode('IT');
         $city->setAdmin1Code('09');
         $city->setAdmin2Code('TO');
