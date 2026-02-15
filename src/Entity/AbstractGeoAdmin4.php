@@ -48,6 +48,8 @@ abstract class AbstractGeoAdmin4
     public function setAdmin4Code(string $admin4Code): self { $this->admin4Code = $admin4Code; return $this; }
     public function getName(): ?string { return $this->name; }
     public function setName(string $name): self { $this->name = $name; return $this; }
+    public function getAsciiName(): ?string { return $this->asciiName; }
+    public function setAsciiName(?string $asciiName): self { $this->asciiName = $asciiName; return $this; }
     public function getGeonameId(): ?int { return $this->geonameId; }
     public function setGeonameId(?int $geonameId): self { $this->geonameId = $geonameId; return $this; }
 }

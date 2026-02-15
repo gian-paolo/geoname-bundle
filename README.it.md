@@ -96,7 +96,7 @@ Crea questi file in `src/Entity/`. Ogni classe deve estendere la corrispondente 
 | `GeoLanguage.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoLanguage` |
 | `GeoImport.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoImport` |
 | `GeoAdmin1.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin1` |
-| `GeoAdmin2.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin2` |
+| `GeoAdmin2.php" | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin2` |
 | `GeoAdmin3.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin3` |
 | `GeoAdmin4.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin4` |
 | `GeoAdmin5.php` | `\Pallari\GeonameBundle\Entity\AbstractGeoAdmin5` |
@@ -194,14 +194,14 @@ Per ricerche istantanee, aggiungi questi indici alle tue entità concrete:
 
 // Indice FULLTEXT per ricerche "fuzzy" (solo MySQL/MariaDB)
 // Include alternate_names per trovare città con nomi comuni diversi
-#[ORM\Index(columns: ['name', 'asciiname', 'alternatenames'], name: 'idx_fulltext', flags: ['fulltext'])]
+#[ORM\Index(columns: ['name', 'asciiName', 'alternatenames'], name: 'idx_fulltext', flags: ['fulltext'])]
 ```
 
 ### Ricerca Full-Text
 Se `search.use_fulltext` è abilitato, il bundle usa automaticamente:
 - `MATCH AGAINST` per MySQL/MariaDB.
 - `to_tsvector` per PostgreSQL.
-- **Nota**: Per SQLite (comune nei test), il bundle userà automaticamente il fallback alla ricerca `LIKE` standard per garantire la compatibilità.
+- **Note**: For SQLite (comune nei test), il bundle userà automaticamente il fallback alla ricerca `LIKE` standard per garantire la compatibilità.
 
 ### Esempio Query SQL
 Come unire le tabelle per ottenere un indirizzo completo:
