@@ -16,23 +16,29 @@ return static function (ContainerConfigurator $container): void {
         ],
     ];
 
-    // Detect Doctrine ORM version safely
-    $isOrm2 = method_exists(\Doctrine\ORM\Configuration::class, 'getAutoGenerateProxyClasses');
+    // Detect Doctrine ORM version
+    $isOrm3 = !method_exists(\Doctrine\ORM\Configuration::class, 'getAutoGenerateProxyClasses');
     
-    // Detect Doctrine Bundle version
-    // enable_lazy_ghost_objects was added in 2.12
-    $hasGhostObjectsOption = class_exists(\Doctrine\Bundle\DoctrineBundle\Controller\ArgumentResolver\EntityValueResolver::class);
+    // Detect Doctrine Bundle capabilities by looking at its configuration class
+    // This is more reliable than checking the version string
+    $bundleConfigClass = new \ReflectionClass(\Doctrine\Bundle\DoctrineBundle\DependencyInjection\Configuration::class);
+    $configMethod = $bundleConfigClass->getMethod('getConfigTreeBuilder');
+    // We won't parse the whole tree, but we can check for ORM 3.0 specific changes
+    $isBundle3 = !class_exists(\Doctrine\Bundle\DoctrineBundle\Command\Proxy\ImportDoctrineProxyCommand::class);
 
-    if (!$isOrm2) {
-        // ORM 3: Many legacy options are gone
+    if ($isOrm3) {
+        // ORM 3: most legacy proxy/lazy settings are now handled automatically or moved
         $ormConfig['controller_resolver'] = ['auto_mapping' => false];
     } else {
         // ORM 2
-        $ormConfig['auto_generate_proxy_classes'] = true;
-        if ($hasGhostObjectsOption) {
-            // We enable it ONLY if we are on ORM 2 and the bundle supports it.
-            // On ORM 3 it's mandatory and cannot be disabled.
-            $ormConfig['enable_lazy_ghost_objects'] = true;
+        if (!$isBundle3) {
+            // Option only available in Bundle < 3.0
+            $ormConfig['auto_generate_proxy_classes'] = true;
+        }
+        
+        // ghost objects option was only relevant for Bundle 2.12+ with ORM 2
+        if (class_exists(\Doctrine\Bundle\DoctrineBundle\Controller\ArgumentResolver\EntityValueResolver::class)) {
+             $ormConfig['enable_lazy_ghost_objects'] = true;
         }
     }
 
