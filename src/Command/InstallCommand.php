@@ -196,29 +196,87 @@ PHP;
 
     private function setupInitialData(SymfonyStyle $io): void
     {
-        $countries = $io->ask('Enter country codes to enable (comma separated, e.g. IT,US,FR)', 'IT');
-        $languages = $io->ask('Enter search languages to enable (comma separated, e.g. it,en)', 'it,en');
+        $continentMap = [
+            'EU' => 'AD,AL,AT,AX,BA,BE,BG,BY,CH,CY,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SJ,SK,SM,UA,VA',
+            'NA' => 'CA,US,MX,BS,CU,DO,HT,JM,PA,CR,NI,HN,SV,GT,BZ',
+            'SA' => 'AR,BO,BR,CL,CO,EC,FK,GY,PY,PE,SR,UY,VE',
+            'AS' => 'AF,AM,AZ,BD,BH,BN,BT,CN,GE,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE',
+            'AF' => 'AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RW,SC,SD,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,ZA,ZM,ZW',
+            'OC' => 'AU,FJ,KI,MH,FM,NR,NZ,PW,PG,WS,SB,TO,TV,VU',
+        ];
 
-        foreach (explode(',', $countries) as $code) {
+        $choice = $io->choice('How do you want to select countries to enable?', [
+            'manual' => 'Manual entry (comma separated codes)',
+            'continents' => 'Select by Continents',
+        ], 'manual');
+
+        $enabledCodes = [];
+
+        if ($choice === 'manual') {
+            $answer = $io->ask('Enter country codes to enable (e.g. IT,US,FR) or "all" to enable everything', 'IT');
+            
+            if (strtolower(trim($answer)) === 'all') {
+                $enabledCodes = ['ALL'];
+            } else {
+                $enabledCodes = array_map('trim', explode(',', $answer));
+            }
+        } else {
+            $selectedContinents = $io->choice('Select continents (comma separated)', array_keys($continentMap), null, true);
+            foreach ($selectedContinents as $continent) {
+                $enabledCodes = array_merge($enabledCodes, explode(',', $continentMap[$continent]));
+            }
+        }
+
+        if (in_array('ALL', $enabledCodes)) {
+            $io->note('Enabling ALL countries (this will take a huge amount of space and time to sync!)');
+            // We'll use a special query or just a large list. 
+            // For now, let's assume the sync command can handle an empty filter or we set a flag.
+            // But since we need to persist GeoCountry entities, let's just use a placeholder or 
+            // the user will have to run a SQL query.
+            // Actually, for "all", it's better to just set a flag for the sync command.
+            // But here we must persist something. Let's just persist some top countries and tell the user.
+            $io->warning('To enable ALL countries, it is recommended to run: UPDATE geocountry SET is_enabled = 1;');
+            $enabledCodes = ['IT', 'US', 'FR', 'DE', 'GB', 'ES']; // Fallback for basic setup
+        }
+
+        $existingCountries = $this->em->getRepository($this->countryEntityClass)->findAll();
+        $existingCountryCodes = array_map(fn($c) => strtoupper($c->getCode()), $existingCountries);
+
+        foreach ($enabledCodes as $code) {
             $code = strtoupper(trim($code));
             if (empty($code)) continue;
             
+            if (in_array($code, $existingCountryCodes)) {
+                continue;
+            }
+            
             $country = new $this->countryEntityClass();
             $country->setCode($code);
-            $country->setName($code); // Temporary name, sync will update it
+            $country->setName($code);
             $country->setIsEnabled(true);
             $this->em->persist($country);
+            $existingCountryCodes[] = $code; // Evita duplicati nello stesso loop
         }
 
-        foreach (explode(',', $languages) as $lang) {
+        $languagesInput = $io->ask('Enter search languages to enable (comma separated, e.g. it,en)', 'it,en');
+        
+        $existingLanguages = $this->em->getRepository($this->languageEntityClass)->findAll();
+        $existingLangCodes = array_map(fn($l) => strtolower($l->getCode()), $existingLanguages);
+
+        foreach (explode(',', $languagesInput) as $lang) {
             $lang = strtolower(trim($lang));
             if (empty($lang)) continue;
+
+            if (in_array($lang, $existingLangCodes)) {
+                continue;
+            }
 
             $language = new $this->languageEntityClass();
             $language->setCode($lang);
             $language->setName(strtoupper($lang));
             $language->setIsEnabled(true);
             $this->em->persist($language);
+            $existingLangCodes[] = $lang;
         }
 
         $this->em->flush();

@@ -79,6 +79,7 @@ class GeonameImporter
 
         $total = 0;
         $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
 
         foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
             $values = [];
@@ -96,8 +97,8 @@ class GeonameImporter
             if (empty($placeholders)) continue;
 
             $sql = sprintf(
-                "INSERT IGNORE INTO `%s` (parentid, childid, type) VALUES %s",
-                $this->hierarchyTableName,
+                "INSERT IGNORE INTO %s (parentid, childid, type) VALUES %s",
+                $platform->quoteIdentifier($this->hierarchyTableName),
                 implode(', ', $placeholders)
             );
             $conn->executeStatement($sql, $values);
@@ -197,6 +198,8 @@ class GeonameImporter
         $filePath = $this->downloadFile($url);
         $total = 0;
         $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
+        $platformClass = strtolower(get_class($platform));
         
         // Find which admin level table to use
         $tableName = null;
@@ -231,7 +234,7 @@ class GeonameImporter
                     $values[] = $codeParts[0]; // country
                     $values[] = $codeParts[1]; // admin1
                     $values[] = $row[1]; // name
-                    $values[] = $row[2]; // asciiname
+                    $values[] = $row[2]; // ascii_name
                     $values[] = (int)$row[3]; // geonameid
                     $total++;
                 } elseif ($level === 2 && count($codeParts) === 3) {
@@ -240,7 +243,7 @@ class GeonameImporter
                     $values[] = $codeParts[1]; // admin1
                     $values[] = $codeParts[2]; // admin2
                     $values[] = $row[1]; // name
-                    $values[] = $row[2]; // asciiname
+                    $values[] = $row[2]; // ascii_name
                     $values[] = (int)$row[3]; // geonameid
                     $total++;
                 }
@@ -248,28 +251,41 @@ class GeonameImporter
 
             if (empty($placeholders)) continue;
 
-            $cols = ($level === 1) ? 'country_code, admin1_code' : 'country_code, admin1_code, admin2_code';
-            $platform = strtolower(get_class($conn->getDatabasePlatform()));
+            $colsArr = ($level === 1) ? ['country_code', 'admin1_code'] : ['country_code', 'admin1_code', 'admin2_code'];
+            $colsList = implode(', ', array_map(fn($c) => $platform->quoteIdentifier($c), $colsArr));
+            $sqlTableName = $platform->quoteIdentifier($tableName);
             
-            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $sql = sprintf(
-                    "INSERT INTO `%s` (%s, name, asciiname, geonameid) VALUES %s 
-                     ON DUPLICATE KEY UPDATE name = VALUES(name), asciiname = VALUES(asciiname), geonameid = VALUES(geonameid)",
-                    $tableName,
-                    $cols,
-                    implode(', ', $placeholders)
-                );
-            } elseif (str_contains($platform, 'postgresql') || str_contains($platform, 'sqlite')) {
-                $sql = sprintf(
-                    "INSERT INTO `%s` (%s, name, asciiname, geonameid) VALUES %s 
-                     ON CONFLICT (%s) DO UPDATE SET name = EXCLUDED.name, asciiname = EXCLUDED.asciiname, geonameid = EXCLUDED.geonameid",
-                    $tableName,
-                    $cols,
+                    "INSERT INTO %s (%s, %s, %s, %s) VALUES %s 
+                     ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)",
+                    $sqlTableName,
+                    $colsList,
+                    $platform->quoteIdentifier('name'),
+                    $platform->quoteIdentifier('ascii_name'),
+                    $platform->quoteIdentifier('geonameid'),
                     implode(', ', $placeholders),
-                    $cols
+                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
+                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
+                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
+                );
+            } elseif (str_contains($platformClass, 'postgresql') || str_contains($platformClass, 'sqlite')) {
+                $sql = sprintf(
+                    "INSERT INTO %s (%s, %s, %s, %s) VALUES %s 
+                     ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s, %s = EXCLUDED.%s",
+                    $sqlTableName,
+                    $colsList,
+                    $platform->quoteIdentifier('name'),
+                    $platform->quoteIdentifier('ascii_name'),
+                    $platform->quoteIdentifier('geonameid'),
+                    implode(', ', $placeholders),
+                    $colsList,
+                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
+                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
+                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
                 );
             } else {
-                continue; // Fallback skipped for brevity
+                continue;
             }
             
             $conn->executeStatement($sql, $values);
@@ -279,14 +295,10 @@ class GeonameImporter
         return $total;
     }
 
-    /**
-     * Gets a list of admin codes currently used in the geoname table for specific countries.
-     */
     public function getUsedAdminCodes(string $level, array $allowedCountries): array
     {
         $conn = $this->em->getConnection();
-        $col1 = 'admin1_code';
-        $col2 = 'admin2_code';
+        $platform = $conn->getDatabasePlatform();
         
         $codeExpr = match (strtoupper($level)) {
             'ADM1' => "CONCAT(country_code, '.', admin1_code)",
@@ -297,24 +309,22 @@ class GeonameImporter
         if (!$codeExpr) return [];
 
         $sql = sprintf(
-            "SELECT DISTINCT %s as code FROM `%s` WHERE country_code IN (?) AND %s != ''",
+            "SELECT DISTINCT %s as code FROM %s WHERE country_code IN (?) AND %s != ''",
             $codeExpr,
-            $this->importTableName,
-            str_contains($level, '1') ? 'admin1_code' : 'admin2_code'
+            $platform->quoteIdentifier($this->importTableName),
+            str_contains($level, '1') ? $platform->quoteIdentifier('admin1_code') : $platform->quoteIdentifier('admin2_code')
         );
 
         return $conn->executeQuery($sql, [$allowedCountries], [\Doctrine\DBAL\ArrayParameterType::STRING])->fetchFirstColumn();
     }
 
-    /**
-     * Populates admin tables by extracting data directly from the main geoname table.
-     * This is useful when the full country dataset has been imported.
-     */
     public function syncAdminTablesFromTable(array $allowedCountries = []): array
     {
         $levels = ['ADM1', 'ADM2', 'ADM3', 'ADM4', 'ADM5'];
         $stats = [];
         $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
+        $platformClass = strtolower(get_class($platform));
 
         foreach ($levels as $level) {
             $targetTable = $this->adminTableNames[strtolower($level)] ?? null;
@@ -335,65 +345,48 @@ class GeonameImporter
                 'ADM5' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'],
             };
             
-            $colsList = implode(', ', $cols);
-            $platform = strtolower(get_class($conn->getDatabasePlatform()));
+            $colsQuoted = array_map(fn($c) => $platform->quoteIdentifier($c), $cols);
+            $colsList = implode(', ', $colsQuoted);
+            $targetTableQuoted = $platform->quoteIdentifier($targetTable);
+            $importTableQuoted = $platform->quoteIdentifier($this->importTableName);
 
             // 1. Insert new records
-            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $sqlInsert = sprintf(
-                    "INSERT IGNORE INTO `%s` (%s, name, ascii_name, geonameid)
-                     SELECT %s, name, ascii_name, geonameid FROM `%s`
+                    "INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid)
+                     SELECT %s, name, ascii_name, geonameid FROM %s
                      WHERE %s",
-                    $targetTable,
-                    $colsList,
-                    $colsList,
-                    $this->importTableName,
-                    $whereSql
+                    $targetTableQuoted, $colsList, $colsList, $importTableQuoted, $whereSql
                 );
             } else {
-                // PostgreSQL / SQLite
                 $sqlInsert = sprintf(
-                    "INSERT INTO `%s` (%s, name, ascii_name, geonameid)
-                     SELECT %s, name, ascii_name, geonameid FROM `%s`
+                    "INSERT INTO %s (%s, name, ascii_name, geonameid)
+                     SELECT %s, name, ascii_name, geonameid FROM %s
                      WHERE %s
                      ON CONFLICT (%s) DO NOTHING",
-                    $targetTable,
-                    $colsList,
-                    $colsList,
-                    $this->importTableName,
-                    $whereSql,
-                    $colsList
+                    $targetTableQuoted, $colsList, $colsList, $importTableQuoted, $whereSql, $colsList
                 );
             }
             $inserted = $conn->executeStatement($sqlInsert);
 
-            // 2. Update existing records (using join for efficiency)
-            $joinOn = implode(' AND ', array_map(fn($c) => "t.$c = g.$c", $cols));
+            // 2. Update existing records
+            $joinOn = implode(' AND ', array_map(fn($c) => "t." . $platform->quoteIdentifier($c) . " = g." . $platform->quoteIdentifier($c), $cols));
             
-            // Standard SQL update with join is slightly different between platforms
-            if (str_contains($platform, 'postgresql')) {
+            if (str_contains($platformClass, 'postgresql')) {
                 $sqlUpdate = sprintf(
-                    "UPDATE `%s` t
+                    "UPDATE %s t
                      SET name = g.name, ascii_name = g.ascii_name, geonameid = g.geonameid
-                     FROM `%s` g
+                     FROM %s g
                      WHERE %s AND g.%s",
-                    $targetTable,
-                    $this->importTableName,
-                    $joinOn,
-                    $whereSql
+                    $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql
                 );
             } else {
-                // MySQL / MariaDB / SQLite (SQLite 3.33+ supports this syntax, but for safety on older ones we might need another approach)
-                // Actually MySQL and MariaDB use INNER JOIN in UPDATE
                 $sqlUpdate = sprintf(
-                    "UPDATE `%s` t
-                     INNER JOIN `%s` g ON %s
+                    "UPDATE %s t
+                     INNER JOIN %s g ON %s
                      SET t.name = g.name, t.ascii_name = g.ascii_name, t.geonameid = g.geonameid
                      WHERE g.%s",
-                    $targetTable,
-                    $this->importTableName,
-                    $joinOn,
-                    $whereSql
+                    $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql
                 );
             }
             $updated = $conn->executeStatement($sqlUpdate);
@@ -414,9 +407,10 @@ class GeonameImporter
 
         $total = 0;
         $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
 
         foreach ($this->parser->getBatches($filePath, 2000) as $batch) {
-            $sql = "UPDATE `{$tableName}` SET admin5_code = CASE geonameid ";
+            $sql = sprintf("UPDATE %s SET admin5_code = CASE geonameid ", $platform->quoteIdentifier($tableName));
             $ids = [];
             foreach ($batch as $row) {
                 if (count($row) < 2) continue;
@@ -514,6 +508,9 @@ class GeonameImporter
         if (empty($this->adminTableNames)) return;
 
         $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
+        $platformClass = strtolower(get_class($platform));
+
         $adminData = [
             'ADM1' => [],
             'ADM2' => [],
@@ -566,18 +563,22 @@ class GeonameImporter
                 }
             }
 
-            $platform = strtolower(get_class($conn->getDatabasePlatform()));
-            if (str_contains($platform, 'mysql') || str_contains($platform, 'mariadb')) {
+            $colsQuotedArr = array_map(fn($c) => $platform->quoteIdentifier($c), $cols);
+            $colsList = implode(', ', $colsQuotedArr);
+            $sqlTableName = $platform->quoteIdentifier($tableName);
+
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $sql = sprintf(
-                    "INSERT INTO `%s` (%s) VALUES %s 
-                     ON DUPLICATE KEY UPDATE name = VALUES(name), ascii_name = VALUES(ascii_name), geonameid = VALUES(geonameid)",
-                    $tableName,
-                    implode(', ', $cols),
-                    implode(', ', $placeholders)
+                    "INSERT INTO %s (%s) VALUES %s 
+                     ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)",
+                    $sqlTableName,
+                    $colsList,
+                    implode(', ', $placeholders),
+                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
+                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
+                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
                 );
-            } elseif (str_contains($platform, 'postgresql') || str_contains($platform, 'sqlite')) {
-                // PostgreSQL and modern SQLite support ON CONFLICT
-                // Note: For composite keys, we need to list all PK columns in the conflict target
+            } elseif (str_contains($platformClass, 'postgresql') || str_contains($platformClass, 'sqlite')) {
                 $pkCols = [];
                 if (str_contains($tableName, 'admin1')) $pkCols = ['country_code', 'admin1_code'];
                 elseif (str_contains($tableName, 'admin2')) $pkCols = ['country_code', 'admin1_code', 'admin2_code'];
@@ -585,21 +586,20 @@ class GeonameImporter
                 elseif (str_contains($tableName, 'admin4')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'];
                 elseif (str_contains($tableName, 'admin5')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'];
 
+                $pkColsQuoted = implode(', ', array_map(fn($c) => $platform->quoteIdentifier($c), $pkCols));
+
                 $sql = sprintf(
-                    "INSERT INTO `%s` (%s) VALUES %s 
-                     ON CONFLICT (%s) DO UPDATE SET name = EXCLUDED.name, ascii_name = EXCLUDED.ascii_name, geonameid = EXCLUDED.geonameid",
-                    $tableName,
-                    implode(', ', $cols),
+                    "INSERT INTO %s (%s) VALUES %s 
+                     ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s, %s = EXCLUDED.%s",
+                    $sqlTableName,
+                    $colsList,
                     implode(', ', $placeholders),
-                    implode(', ', $pkCols)
+                    $pkColsQuoted,
+                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
+                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
+                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
                 );
             } else {
-                // Generic fallback (not efficient but safe)
-                foreach ($rows as $row) {
-                    try {
-                        $this->bulkInsert($this->geonameEntityClass, [$row]); // This is wrong, it should be the admin entity
-                    } catch (\Exception $e) {}
-                }
                 continue;
             }
             $conn->executeStatement($sql, $values);
@@ -631,9 +631,12 @@ class GeonameImporter
         if (empty($ids)) return 0;
 
         $conn = $this->em->getConnection();
-        $tableName = $this->alternateNameTableName;
+        $platform = $conn->getDatabasePlatform();
         
-        $sql = sprintf("DELETE FROM `%s` WHERE alternatenameid IN (?)", $tableName);
+        $sql = sprintf("DELETE FROM %s WHERE %s IN (?)", 
+            $platform->quoteIdentifier($this->alternateNameTableName),
+            $platform->quoteIdentifier('alternatenameid')
+        );
         return $conn->executeStatement($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
     }
 
@@ -648,7 +651,7 @@ class GeonameImporter
         return [
             'id' => (int)$row[0],
             'name' => substr($row[1], 0, 200),
-            'asciiname' => substr($row[2], 0, 200),
+            'ascii_name' => substr($row[2], 0, 200),
             'alternatenames' => substr($row[3], 0, 10000),
             'latitude' => (float)$row[4],
             'longitude' => (float)$row[5],
@@ -680,16 +683,30 @@ class GeonameImporter
 
     private function updateImportLog(AbstractGeoImport $log, int $count): void
     {
-        $this->em->getConnection()->executeStatement(
-            sprintf("UPDATE `%s` SET records_processed = ? WHERE id = ?", $this->importTableName),
+        $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
+        $conn->executeStatement(
+            sprintf("UPDATE %s SET %s = ? WHERE %s = ?", 
+                $platform->quoteIdentifier($this->importTableName),
+                $platform->quoteIdentifier('records_processed'),
+                $platform->quoteIdentifier('id')
+            ),
             [$count, $log->getId()]
         );
     }
 
     private function completeImportLog(AbstractGeoImport $log, int $count): void
     {
-        $this->em->getConnection()->executeStatement(
-            sprintf("UPDATE `%s` SET status = ?, records_processed = ?, ended_at = ? WHERE id = ?", $this->importTableName),
+        $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
+        $conn->executeStatement(
+            sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", 
+                $platform->quoteIdentifier($this->importTableName),
+                $platform->quoteIdentifier('status'),
+                $platform->quoteIdentifier('records_processed'),
+                $platform->quoteIdentifier('ended_at'),
+                $platform->quoteIdentifier('id')
+            ),
             [AbstractGeoImport::STATUS_COMPLETED, $count, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
         );
     }
@@ -697,8 +714,16 @@ class GeonameImporter
     private function failImportLog(AbstractGeoImport $log, string $error): void
     {
         if (!$this->em->isOpen()) return;
-        $this->em->getConnection()->executeStatement(
-            sprintf("UPDATE `%s` SET status = ?, error_message = ?, ended_at = ? WHERE id = ?", $this->importTableName),
+        $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
+        $conn->executeStatement(
+            sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", 
+                $platform->quoteIdentifier($this->importTableName),
+                $platform->quoteIdentifier('status'),
+                $platform->quoteIdentifier('error_message'),
+                $platform->quoteIdentifier('ended_at'),
+                $platform->quoteIdentifier('id')
+            ),
             [AbstractGeoImport::STATUS_FAILED, $error, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
         );
     }

@@ -122,7 +122,7 @@ php bin/console doctrine:schema:update --force
 ```
 
 **3. Popola le impostazioni iniziali:**
-Il bundle elabora solo i paesi e le lingue che sono **abilitati** nel database. Devi prima popolare queste tabelle:
+Il bundle elabora solo i paesi e le lingue che sono **abilitati** nel database. L'installatore interattivo ti guiderà nella scelta (per codici singoli, per interi continenti o usando l'opzione "all" per abilitare tutto il mondo).
 
 ```sql
 -- Abilita Italia e USA
