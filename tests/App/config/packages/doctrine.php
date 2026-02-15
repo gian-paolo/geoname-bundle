@@ -3,9 +3,6 @@
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 return static function (ContainerConfigurator $container): void {
-    // We use the most basic configuration possible that works across all versions
-    // of doctrine-bundle (2.x and 3.x) and doctrine/orm (2.x and 3.x).
-    
     $container->extension('doctrine', [
         'dbal' => [
             'url' => '%env(resolve:DATABASE_URL)%',
