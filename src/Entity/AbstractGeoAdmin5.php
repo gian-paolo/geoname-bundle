@@ -35,7 +35,7 @@ abstract class AbstractGeoAdmin5
     protected ?string $name = null;
 
     #[ORM\Column(name: 'ascii_name', length: 200, nullable: true, options: ['charset' => 'ascii'])]
-    protected ?string $asciiname = null;
+    protected ?string $asciiName = null;
 
     #[ORM\Column(name: 'geonameid', type: 'integer', nullable: true)]
     protected ?int $geonameId = null;

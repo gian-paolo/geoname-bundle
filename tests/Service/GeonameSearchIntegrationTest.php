@@ -18,7 +18,8 @@ class GeonameSearchIntegrationTest extends KernelTestCase
         $em = $container->get('doctrine.orm.entity_manager');
         $metadatas = $em->getMetadataFactory()->getAllMetadata();
         $schemaTool = new \Doctrine\ORM\Tools\SchemaTool($em);
-        $schemaTool->updateSchema($metadatas);
+        $schemaTool->dropSchema($metadatas);
+        $schemaTool->createSchema($metadatas);
     }
 
     public function testSearchWithCompositeJoins(): void
@@ -46,7 +47,7 @@ class GeonameSearchIntegrationTest extends KernelTestCase
         $city = new GeoName();
         $city->setId(3165524);
         $city->setName('Torino');
-        $city->setAsciiname('Torino');
+        $city->setAsciiName('Torino');
         $city->setCountryCode('IT');
         $city->setAdmin1Code('09');
         $city->setAdmin2Code('TO');

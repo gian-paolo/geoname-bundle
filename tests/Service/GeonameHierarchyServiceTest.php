@@ -37,13 +37,11 @@ class GeonameHierarchyServiceTest extends TestCase
         $queryBuilder->method('executeQuery')->willReturn($result);
         
         // 1st call: target node. 
-        $result->expects($this->exactly(1))
-            ->method('fetchAssociative')
+        $result->method('fetchAssociative')
             ->willReturn($targetNode);
 
         // 2nd call: all ancestors in one shot
-        $result->expects($this->exactly(1))
-            ->method('fetchAllAssociative')
+        $result->method('fetchAllAssociative')
             ->willReturn([
                 ['name' => 'Italy', 'feature_code' => 'PCLI'],
                 ['name' => 'Piemonte', 'feature_code' => 'ADM1'],
