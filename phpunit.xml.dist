@@ -13,8 +13,7 @@
     <php>
         <env name="KERNEL_CLASS" value="Pallari\GeonameBundle\Tests\App\Kernel"/>
         <env name="APP_ENV" value="test"/>
-
-        <env name="DATABASE_URL" value="sqlite:///%kernel.project_dir%/var/test.db"/>
+        <env name="DATABASE_URL" value="sqlite:///./tests/App/var/test.db"/>
     </php>
 
     <coverage>

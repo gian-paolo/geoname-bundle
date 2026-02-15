@@ -1,6 +1,6 @@
 doctrine:
     dbal:
-        url: '%env(default:DEFAULT_DATABASE_URL:DATABASE_URL)%'
+        url: '%env(DATABASE_URL)%'
     orm:
         auto_generate_proxy_classes: true
         report_fields_where_declared: true
