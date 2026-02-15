@@ -1,5 +1,6 @@
 {
     "name": "pallari/geoname-bundle",
+    "version": "0.6.0-beta.1",
     "description": "A Symfony bundle for GeoNames with incremental daily updates support.",
     "type": "symfony-bundle",
     "license": "MIT",
@@ -11,24 +12,25 @@
     ],
     "require": {
         "php": ">=8.2",
-        "symfony/framework-bundle": "^6.4|^7.0|^8.0",
-        "doctrine/doctrine-bundle": "^2.10",
-        "symfony/http-client": "^6.4|^7.0|^8.0"
+        "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
+        "doctrine/doctrine-bundle": "^2.10 || ^3.0",
+        "doctrine/orm": "^2.15 || ^3.0",
+        "symfony/http-client": "^6.4 || ^7.0 || ^8.0"
     },
     "require-dev": {
-        "doctrine/orm": "^3.6",
-        "phpunit/phpunit": "^13.0",
-        "symfony/phpunit-bridge": "^8.0",
-        "symfony/yaml": "^8.0"
+        "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0 || ^13.0",
+        "symfony/phpunit-bridge": "^6.4 || ^7.0 || ^8.0",
+        "symfony/var-exporter": "^6.4 || ^7.0 || ^8.0",
+        "symfony/yaml": "^6.4 || ^7.0 || ^8.0"
     },
     "autoload": {
         "psr-4": {
-            "Gpp\\GeonameBundle\\": "src/"
+            "Pallari\\GeonameBundle\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Gpp\\GeonameBundle\\Tests\\": "tests/"
+            "Pallari\\GeonameBundle\\Tests\\": "tests/"
         }
     },
     "config": {
