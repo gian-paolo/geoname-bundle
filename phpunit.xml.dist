@@ -14,7 +14,7 @@
         <env name="KERNEL_CLASS" value="Pallari\GeonameBundle\Tests\App\Kernel"/>
         <env name="APP_ENV" value="test"/>
         <env name="DATABASE_URL" value="sqlite:///./tests/App/var/test.db"/>
-        <env name="SYMFONY_DEPRECATIONS_HELPER" value="max[self]=0"/>
+        <env name="SYMFONY_DEPRECATIONS_HELPER" value="max[self]=0&amp;max[indirect]=999"/>
     </php>
 
     <coverage>
