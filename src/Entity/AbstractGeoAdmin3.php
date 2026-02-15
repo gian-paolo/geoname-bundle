@@ -42,6 +42,8 @@ abstract class AbstractGeoAdmin3
     public function setAdmin3Code(string $admin3Code): self { $this->admin3Code = $admin3Code; return $this; }
     public function getName(): ?string { return $this->name; }
     public function setName(string $name): self { $this->name = $name; return $this; }
+    public function getAsciiName(): ?string { return $this->asciiName; }
+    public function setAsciiName(?string $asciiName): self { $this->asciiName = $asciiName; return $this; }
     public function getGeonameId(): ?int { return $this->geonameId; }
     public function setGeonameId(?int $geonameId): self { $this->geonameId = $geonameId; return $this; }
 }

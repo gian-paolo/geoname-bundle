@@ -1,17 +1,19 @@
-# GppGeonameBundle
+# GeonameBundle
 
-[![Symfony](https://img.shields.io/badge/Symfony-%5E6.4%20%7C%20%5E7.0-000000?style=flat-square&logo=symfony)](https://symfony.com)
+[![Symfony](https://img.shields.io/badge/Symfony-%5E6.4%20%7C%20%5E7.0%20%7C%20%5E8.0-000000?style=flat-square&logo=symfony)](https://symfony.com)
 [![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-777bb4?style=flat-square&logo=php)](https://php.net)
 [![Latest Stable Version](https://img.shields.io/packagist/v/pallari/geoname-bundle.svg?style=flat-square)](https://packagist.org/packages/pallari/geoname-bundle)
 [![Total Downloads](https://img.shields.io/packagist/dt/pallari/geoname-bundle.svg?style=flat-square)](https://packagist.org/packages/pallari/geoname-bundle)
 [![Tests](https://github.com/gian-paolo/geoname-bundle/actions/workflows/tests.yml/badge.svg)](https://github.com/gian-paolo/geoname-bundle/actions)
 
-**GppGeonameBundle** è una soluzione sperimentale ad alte prestazioni per integrare e mantenere aggiornati i dati geografici di [GeoNames](https://www.geonames.org/) nelle tue applicazioni Symfony.
-A differenza di altri bundle, questo è progettato per gestire **milioni di record** con un consumo di memoria minimo e un sistema di **aggiornamento quotidiano incrementale** (sync) che evita di dover ricaricare l'intero database ogni volta.
+🇮🇹 [Leggi la documentazione in Italiano](./README.it.md)
+
+**GeonameBundle** is a high-performance solution for integrating and maintaining up-to-date geographical data from [GeoNames](https://www.geonames.org/) in your Symfony applications.
+Unlike other bundles, it is designed to handle **millions of records** with minimal memory consumption and an **incremental daily sync** system that avoids reloading the entire database every time.
 
 ---
 
-## 🚀 Caratteristiche Principali
+## 🚀 Key Features
 
 - **Interactive Installer**: Complete setup in seconds with `pallari:geoname:install`.
 - **Smart Synchronization**: Downloads and applies only daily changes and deletions from GeoNames.
@@ -37,7 +39,7 @@ Whether you are using **MySQL**, **MariaDB**, or **PostgreSQL**, you will get th
 
 1. **Install the package**:
 ```bash
-composer require gpp/geoname-bundle
+composer require pallari/geoname-bundle
 ```
 
 2. **Run the Interactive Installer**:
@@ -108,7 +110,7 @@ Create these files in `src/Entity/`. Each class must extend the corresponding ab
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Gpp\GeonameBundle\Entity\AbstractGeoName;
+use Pallari\GeonameBundle\Entity\AbstractGeoName;
 
 #[ORM\Entity]
 class GeoName extends AbstractGeoName {
@@ -122,7 +124,7 @@ php bin/console doctrine:schema:update --force
 ```
 
 **3. Populate initial settings:**
-The bundle only syncs countries and languages that are **enabled** in your database. Populate these tables first:
+The bundle only syncs countries and languages that are **enabled** in your database. The interactive installer will ask for these, or you can use the manual "all" keyword (hidden) to enable every country globally.
 
 ```sql
 -- Enable Italy and USA
@@ -134,10 +136,10 @@ INSERT INTO geolanguage (code, name, is_enabled) VALUES ('it', 'Italian', 1), ('
 
 ---
 
-## 📖 Come si usa
+## 📖 Usage
 
-### 1. Importa i nomi di Regioni e Province
-I codici amministrativi (es. "IT.09") sono inutili se non sappiamo che significano "Piemonte". Esegui questo comando una volta:
+### 1. Import Administrative Codes
+Administrative codes (e.g., "IT.09") need their labels (e.g., "Piemonte"). Run this command once:
 ```bash
 php bin/console pallari:geoname:import-admin-codes
 ```
@@ -149,7 +151,7 @@ The first time it will download full data, then it will only download updates fr
 ```bash
 php bin/console pallari:geoname:sync
 ```
-*Suggerimento: metti questo comando nel tuo **Crontab** per farlo girare ogni mattina alle 06:00.*
+*Tip: Add this command to your **Crontab** to run every morning at 06:00 UTC.*
 
 ---
 
@@ -178,18 +180,28 @@ public function searchExample(GeonameSearchService $searchService)
 
 ## ⚙️ Technical Details
 
-### Strategia di Aggiornamento "Hybrid"
-Invece di usare un rischioso `UPSERT` (come `ON DUPLICATE KEY UPDATE`), il bundle segue un processo in 3 fasi per ogni blocco di 1000 righe:
-1. **Check**: Interroga il DB per identificare quali ID esistono già.
-2. **Split**: Divide il blocco in due liste: `$toInsert` e `$toUpdate`.
-3. **Execute**: Esegue una singola `INSERT` multi-riga e una `UPDATE` multi-riga (usando la sintassi `CASE WHEN`).
-**Risultato**: Solo 3 query totali per ogni 1000 record, mantenendo integrità e trasparenza totale.
+### "Hybrid" Update Strategy
+Instead of using a risky `UPSERT` (like `ON DUPLICATE KEY UPDATE`), the bundle follows a 3-phase process for every block of 1000 rows:
+1. **Check**: Queries the DB to identify which IDs already exist.
+2. **Split**: Divides the block into two lists: `$toInsert` and `$toUpdate`.
+3. **Execute**: Performs a single multi-row `INSERT` and a multi-row `UPDATE` (using `CASE WHEN` syntax).
+**Result**: Only 3 total queries per 1000 records, maintaining full integrity and transparency.
 
 ### Full-Text Search
 If `search.use_fulltext` is enabled, the bundle automatically uses:
 - `MATCH AGAINST` for MySQL/MariaDB.
 - `to_tsvector` for PostgreSQL.
 - **Note**: For SQLite (common in testing), the bundle will automatically fallback to standard `LIKE` searches to ensure compatibility.
+
+### Composite Join Example
+How to join tables to get a full hierarchical address:
+```sql
+SELECT c.name as city, a1.name as region, a2.name as province
+FROM geo_name c
+LEFT JOIN geo_admin1 a1 ON a1.country_code = c.country_code AND a1.admin1_code = c.admin1_code
+LEFT JOIN geo_admin2 a2 ON a2.country_code = c.country_code AND a2.admin1_code = c.admin1_code AND a2.admin2_code = c.admin2_code
+WHERE c.name LIKE 'Torino%' AND c.is_deleted = 0;
+```
 
 ---
 
@@ -199,17 +211,7 @@ This bundle is an independent, open-source project and is **not affiliated, asso
 
 The data provided by the synchronization commands is owned and maintained by GeoNames. It is typically released under the [Creative Commons Attribution 4.0 License](https://creativecommons.org/licenses/by/4.0/). Please respect their [Terms and Conditions](https://www.geonames.org/about.html) and consider supporting them if you find their data useful.
 
-### Esempio Query SQL
-Come unire le tabelle per ottenere un indirizzo completo:
-```sql
-SELECT c.name as citta, a1.name as regione, a2.name as provincia
-FROM geo_name c
-LEFT JOIN geo_admin1 a1 ON a1.code = CONCAT(c.country_code, '.', c.admin1_code)
-LEFT JOIN geo_admin2 a2 ON a2.code = CONCAT(c.country_code, '.', c.admin1_code, '.', c.admin2_code)
-WHERE c.name LIKE 'Torino%' AND c.is_deleted = 0;
-```
-
 ---
 
-## 📄 Licenza
-Questo progetto è rilasciato sotto licenza MIT. Sviluppato con ❤️ da **Gian-Paolo Pallari**.
+## 📄 License
+This project is released under the MIT License. Developed with ❤️ by **Gian-Paolo Pallari**.
