@@ -1,8 +1,8 @@
 <?php
 
-namespace Gpp\GeonameBundle\Tests\Service;
+namespace Pallari\GeonameBundle\Tests\Service;
 
-use Gpp\GeonameBundle\Service\GeonameParser;
+use Pallari\GeonameBundle\Service\GeonameParser;
 use PHPUnit\Framework\TestCase;
 
 class GeonameParserTest extends TestCase

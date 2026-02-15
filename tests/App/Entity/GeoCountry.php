@@ -1,9 +1,9 @@
 <?php
 
-namespace Gpp\GeonameBundle\Tests\App\Entity;
+namespace Pallari\GeonameBundle\Tests\App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Gpp\GeonameBundle\Entity\AbstractGeoCountry;
+use Pallari\GeonameBundle\Entity\AbstractGeoCountry;
 
 #[ORM\Entity]
 class GeoCountry extends AbstractGeoCountry {}

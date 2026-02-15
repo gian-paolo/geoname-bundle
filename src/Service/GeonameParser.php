@@ -1,6 +1,6 @@
 <?php
 
-namespace Gpp\GeonameBundle\Service;
+namespace Pallari\GeonameBundle\Service;
 
 class GeonameParser
 {
@@ -19,7 +19,7 @@ class GeonameParser
         $batch = [];
         $count = 0;
 
-        while (($data = fgetcsv($handle, 0, "	")) !== false) {
+        while (($data = fgetcsv($handle, 0, "	", "\"", "")) !== false) {
             $batch[] = $data;
             $count++;
 
@@ -47,7 +47,7 @@ class GeonameParser
             throw new \RuntimeException(sprintf('Could not open file: %s', $filePath));
         }
 
-        while (($data = fgetcsv($handle, 0, "	")) !== false) {
+        while (($data = fgetcsv($handle, 0, "	", "\"", "")) !== false) {
             yield $data;
         }
 

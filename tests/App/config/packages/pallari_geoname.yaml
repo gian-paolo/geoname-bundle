@@ -1,0 +1,16 @@
+pallari_geoname:
+    entities:
+        geoname: 'Pallari\GeonameBundle\Tests\App\Entity\GeoName'
+        country: 'Pallari\GeonameBundle\Tests\App\Entity\GeoCountry'
+        import: 'Pallari\GeonameBundle\Tests\App\Entity\GeoImport'
+        admin1: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAdmin1'
+        admin2: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAdmin2'
+        admin3: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAdmin3'
+        admin4: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAdmin4'
+        admin5: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAdmin5'
+        alternate_name: 'Pallari\GeonameBundle\Tests\App\Entity\GeoAlternateName'
+        hierarchy: 'Pallari\GeonameBundle\Tests\App\Entity\GeoHierarchy'
+        language: 'Pallari\GeonameBundle\Tests\App\Entity\GeoLanguage'
+    alternate_names:
+        enabled: true
+    table_prefix: 'geoname_'

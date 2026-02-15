@@ -1,6 +1,6 @@
 <?php
 
-namespace Gpp\GeonameBundle\Service;
+namespace Pallari\GeonameBundle\Service;
 
 use Doctrine\DBAL\Connection;
 

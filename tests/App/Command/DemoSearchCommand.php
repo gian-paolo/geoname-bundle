@@ -1,0 +1,64 @@
+<?php
+
+namespace Pallari\GeonameBundle\Tests\App\Command;
+
+use Pallari\GeonameBundle\Service\GeonameSearchService;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
+#[AsCommand(
+    name: 'app:demo:search',
+    description: 'Demo command to test GeonameSearchService',
+)]
+class DemoSearchCommand extends Command
+{
+    public function __construct(
+        private readonly GeonameSearchService $searchService
+    ) {
+        parent::__construct();
+    }
+
+    protected function configure(): void
+    {
+        $this->addArgument('term', InputArgument::REQUIRED, 'The search term (e.g. Torino)');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+        $term = $input->getArgument('term');
+
+        $io->title(sprintf('Searching for: %s', $term));
+
+        $results = $this->searchService->search($term, [
+            'with_admin_names' => true,
+            'limit' => 5
+        ]);
+
+        if (empty($results)) {
+            $io->warning('No results found.');
+            return Command::SUCCESS;
+        }
+
+        foreach ($results as $res) {
+            $io->section(sprintf('%s (%s)', $res['name'], $res['country_code']));
+            $io->definitionList(
+                ['ID' => $res['geonameid']],
+                ['ASCII Name' => $res['ascii_name']],
+                ['Coordinates' => sprintf('%f, %f', $res['latitude'], $res['longitude'])],
+                ['Population' => $res['population'] ?? 'N/A'],
+                ['Region (Admin1)' => sprintf('%s (ID: %s)', $res['admin1_name'] ?? 'N/A', $res['admin1_id'] ?? 'N/A')],
+                ['Province (Admin2)' => sprintf('%s (ID: %s)', $res['admin2_name'] ?? 'N/A', $res['admin2_id'] ?? 'N/A')],
+                ['Municipality (Admin3)' => sprintf('%s (ID: %s)', $res['admin3_name'] ?? 'N/A', $res['admin3_id'] ?? 'N/A')],
+                ['Local Dist (Admin4)' => sprintf('%s (ID: %s)', $res['admin4_name'] ?? 'N/A', $res['admin4_id'] ?? 'N/A')],
+                ['Feature Code' => $res['feature_code']]
+            );
+        }
+
+        return Command::SUCCESS;
+    }
+}

@@ -1,9 +1,9 @@
 <?php
 
-namespace Gpp\GeonameBundle\Tests\Service;
+namespace Pallari\GeonameBundle\Tests\Service;
 
 use Doctrine\DBAL\Connection;
-use Gpp\GeonameBundle\Service\GeonameHierarchyService;
+use Pallari\GeonameBundle\Service\GeonameHierarchyService;
 use PHPUnit\Framework\TestCase;
 
 class GeonameHierarchyServiceTest extends TestCase

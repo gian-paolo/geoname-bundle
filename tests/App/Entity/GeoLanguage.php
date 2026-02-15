@@ -3,7 +3,7 @@
 namespace Pallari\GeonameBundle\Tests\App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Pallari\GeonameBundle\Entity\AbstractGeoAdmin2;
+use Pallari\GeonameBundle\Entity\AbstractGeoLanguage;
 
 #[ORM\Entity]
-class GeoAdmin2 extends AbstractGeoAdmin2 {}
+class GeoLanguage extends AbstractGeoLanguage {}

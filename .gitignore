@@ -29,3 +29,4 @@ Thumbs.db
 # For bundles/libraries, it's common to ignore composer.lock 
 # to test against different dependency versions.
 composer.lock
+/playground/

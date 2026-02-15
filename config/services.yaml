@@ -3,33 +3,90 @@ services:
         autowire: true
         autoconfigure: true
 
-    Gpp\GeonameBundle\Service\GeonameParser: ~
+    Pallari\GeonameBundle\Service\GeonameParser: ~
 
-    Gpp\GeonameBundle\Service\GeonameHierarchyService:
+    Pallari\GeonameBundle\Service\GeonameSearchService:
         arguments:
             $connection: '@database_connection'
-            $geonameTable: '%gpp_geoname.tables.geoname%'
-            $hierarchyTable: '%gpp_geoname.tables.hierarchy%'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
+            $admin1Table: '%pallari_geoname.tables.admin1%'
+            $admin2Table: '%pallari_geoname.tables.admin2%'
+            $admin3Table: '%pallari_geoname.tables.admin3%'
+            $admin4Table: '%pallari_geoname.tables.admin4%'
+            $admin5Table: '%pallari_geoname.tables.admin5%'
+            $useFulltext: '%pallari_geoname.search.use_fulltext%'
 
-    Gpp\GeonameBundle\Service\GeonameImporter:
+    Pallari\GeonameBundle\Service\GeonameHierarchyService:
+        arguments:
+            $connection: '@database_connection'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
+            $hierarchyTable: '%pallari_geoname.tables.hierarchy%'
+
+    Pallari\GeonameBundle\Service\GeonameImporter:
         arguments:
             $em: '@doctrine.orm.entity_manager'
             $httpClient: '@http_client'
-            $tmpDir: '%gpp_geoname.temp_dir%'
+            $tmpDir: '%pallari_geoname.temp_dir%'
         calls:
-            - [setEntityClasses, ['%gpp_geoname.entities.geoname%', '%gpp_geoname.entities.import%']]
-            - [setTableNames, ['%gpp_geoname.tables.import%']]
+            - [setEntityClasses, ['%pallari_geoname.entities.geoname%', '%pallari_geoname.entities.import%', '%pallari_geoname.entities.alternate_name%']]
+            - [setTableNames, ['%pallari_geoname.tables.import%', '%pallari_geoname.tables.hierarchy%', '%pallari_geoname.tables.alternate_name%']]
+            - [setAdminTableNames, [{
+                adm1: '%pallari_geoname.tables.admin1%',
+                adm2: '%pallari_geoname.tables.admin2%',
+                adm3: '%pallari_geoname.tables.admin3%',
+                adm4: '%pallari_geoname.tables.admin4%',
+                adm5: '%pallari_geoname.tables.admin5%'
+              }]]
 
-    Gpp\GeonameBundle\Command\SyncGeonameCommand:
+    Pallari\GeonameBundle\Command\SyncGeonameCommand:
         arguments:
             $em: '@doctrine.orm.entity_manager'
-            $geonameEntityClass: '%gpp_geoname.entities.geoname%'
-            $importEntityClass: '%gpp_geoname.entities.import%'
-            $countryEntityClass: '%gpp_geoname.entities.country%'
+            $countryEntityClass: '%pallari_geoname.entities.country%'
+            $languageEntityClass: '%pallari_geoname.entities.language%'
+            $alternateNamesEnabled: '%pallari_geoname.alternate_names.enabled%'
+            $admin5Enabled: '%pallari_geoname.admin5.enabled%'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
         tags: ['console.command']
 
-    Gpp\GeonameBundle\Command\ImportAdminCodesCommand:
+    Pallari\GeonameBundle\Command\InstallCommand:
         arguments:
-            $admin1EntityClass: '%gpp_geoname.entities.admin1%'
-            $admin2EntityClass: '%gpp_geoname.entities.admin2%'
+            $projectDir: '%kernel.project_dir%'
+            $em: '@doctrine.orm.entity_manager'
+            $countryEntityClass: '%pallari_geoname.entities.country%'
+            $languageEntityClass: '%pallari_geoname.entities.language%'
         tags: ['console.command']
+
+    Pallari\GeonameBundle\Command\ImportAdminCodesCommand:
+        arguments:
+            $em: '@doctrine.orm.entity_manager'
+            $countryEntityClass: '%pallari_geoname.entities.country%'
+            $admin1EntityClass: '%pallari_geoname.entities.admin1%'
+            $admin2EntityClass: '%pallari_geoname.entities.admin2%'
+        tags: ['console.command']
+
+    Pallari\GeonameBundle\EventListener\TablePrefixListener:
+        arguments:
+            $entities:
+                geoname: '%pallari_geoname.entities.geoname%'
+                country: '%pallari_geoname.entities.country%'
+                import: '%pallari_geoname.entities.import%'
+                admin1: '%pallari_geoname.entities.admin1%'
+                admin2: '%pallari_geoname.entities.admin2%'
+                admin3: '%pallari_geoname.entities.admin3%'
+                admin4: '%pallari_geoname.entities.admin4%'
+                admin5: '%pallari_geoname.entities.admin5%'
+                alternate_name: '%pallari_geoname.entities.alternate_name%'
+                hierarchy: '%pallari_geoname.entities.hierarchy%'
+                language: '%pallari_geoname.entities.language%'
+            $tables:
+                geoname: '%pallari_geoname.tables.geoname%'
+                country: '%pallari_geoname.tables.country%'
+                import: '%pallari_geoname.tables.import%'
+                admin1: '%pallari_geoname.tables.admin1%'
+                admin2: '%pallari_geoname.tables.admin2%'
+                admin3: '%pallari_geoname.tables.admin3%'
+                admin4: '%pallari_geoname.tables.admin4%'
+                admin5: '%pallari_geoname.tables.admin5%'
+                alternate_name: '%pallari_geoname.tables.alternate_name%'
+                hierarchy: '%pallari_geoname.tables.hierarchy%'
+                language: '%pallari_geoname.tables.language%'
