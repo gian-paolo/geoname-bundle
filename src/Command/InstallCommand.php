@@ -106,7 +106,7 @@ class InstallCommand extends Command
             }
         }
 
-        $useFulltext = $io->confirm('Enable Full-Text search? (Requires MySQL/PostgreSQL)', false);
+        $useFulltext = $io->confirm('Enable Full-Text search? (Requires MySQL/PostgreSQL)', true);
         $fulltextString = $useFulltext ? 'true' : 'false';
 
         $namespace = rtrim($namespace, '\\');
@@ -221,9 +221,17 @@ PHP;
                 $enabledCodes = array_map('trim', explode(',', $answer));
             }
         } else {
-            $selectedContinents = $io->choice('Select continents (comma separated)', array_keys($continentMap), null, true);
-            foreach ($selectedContinents as $continent) {
-                $enabledCodes = array_merge($enabledCodes, explode(',', $continentMap[$continent]));
+            $continentChoices = [
+                'EU' => 'Europe (EU)',
+                'NA' => 'North America (NA)',
+                'SA' => 'South America (SA)',
+                'AS' => 'Asia (AS)',
+                'AF' => 'Africa (AF)',
+                'OC' => 'Oceania (OC)',
+            ];
+            $selectedContinents = $io->choice('Select continents (comma separated)', $continentChoices, null, true);
+            foreach ($selectedContinents as $continentKey) {
+                $enabledCodes = array_merge($enabledCodes, explode(',', $continentMap[$continentKey]));
             }
         }
 
