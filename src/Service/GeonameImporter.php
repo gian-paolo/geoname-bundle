@@ -354,14 +354,14 @@ class GeonameImporter
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $sqlInsert = sprintf(
                     "INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid)
-                     SELECT %s, name, ascii_name, geonameid FROM %s
+                     SELECT DISTINCT %s, name, ascii_name, geonameid FROM %s
                      WHERE %s",
                     $targetTableQuoted, $colsList, $colsList, $importTableQuoted, $whereSql
                 );
             } else {
                 $sqlInsert = sprintf(
                     "INSERT INTO %s (%s, name, ascii_name, geonameid)
-                     SELECT %s, name, ascii_name, geonameid FROM %s
+                     SELECT DISTINCT %s, name, ascii_name, geonameid FROM %s
                      WHERE %s
                      ON CONFLICT (%s) DO NOTHING",
                     $targetTableQuoted, $colsList, $colsList, $importTableQuoted, $whereSql, $colsList
@@ -523,6 +523,12 @@ class GeonameImporter
             $fCode = $data['featureCode'];
             if (!isset($adminData[$fCode])) continue;
 
+            $code = $data['countryCode'] . '.' . $data['admin1Code'];
+            if (in_array($fCode, ['ADM2', 'ADM3', 'ADM4', 'ADM5'])) $code .= '.' . $data['admin2Code'];
+            if (in_array($fCode, ['ADM3', 'ADM4', 'ADM5'])) $code .= '.' . $data['admin3Code'];
+            if (in_array($fCode, ['ADM4', 'ADM5'])) $code .= '.' . $data['admin4Code'];
+            if ($fCode === 'ADM5') $code .= '.' . ($data['admin5Code'] ?? $data['id']);
+
             $row = [
                 'country_code' => $data['countryCode'],
                 'admin1_code' => $data['admin1Code'],
@@ -544,14 +550,16 @@ class GeonameImporter
                 $row['admin5_code'] = $data['admin5Code'] ?? $data['id'];
             }
 
-            $adminData[$fCode][] = $row;
+            // Use the full code as key to ensure uniqueness within the batch
+            $adminData[$fCode][$code] = $row;
         }
 
         foreach ($adminData as $level => $rows) {
             $tableName = $this->adminTableNames[strtolower($level)] ?? null;
             if (!$tableName || empty($rows)) continue;
 
-            $cols = array_keys($rows[0]);
+            $firstRow = reset($rows);
+            $cols = array_keys($firstRow);
             $placeholders = [];
             $values = [];
             $qs = '(' . implode(', ', array_fill(0, count($cols), '?')) . ')';
