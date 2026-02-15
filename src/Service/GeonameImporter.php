@@ -383,7 +383,7 @@ class GeonameImporter
                     "UPDATE %s t
                      SET name = g.name, ascii_name = g.ascii_name, geonameid = g.geonameid
                      FROM %s g
-                     WHERE %s AND g.%s",
+                     WHERE %s AND %s",
                     $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql
                 );
             } else {
@@ -391,7 +391,7 @@ class GeonameImporter
                     "UPDATE %s t
                      INNER JOIN %s g ON %s
                      SET t.name = g.name, t.ascii_name = g.ascii_name, t.geonameid = g.geonameid
-                     WHERE g.%s",
+                     WHERE %s",
                     $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql
                 );
             }
