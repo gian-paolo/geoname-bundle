@@ -13,6 +13,12 @@ class GeonameSearchIntegrationTest extends KernelTestCase
     protected function setUp(): void
     {
         self::bootKernel();
+        
+        $container = self::getContainer();
+        $em = $container->get('doctrine.orm.entity_manager');
+        $metadatas = $em->getMetadataFactory()->getAllMetadata();
+        $schemaTool = new \Doctrine\ORM\Tools\SchemaTool($em);
+        $schemaTool->updateSchema($metadatas);
     }
 
     public function testSearchWithCompositeJoins(): void
