@@ -20,6 +20,7 @@ class GeonameImporter
     private string $alternateNameTableName = 'geoalternatename';
     private array $adminTableNames = [];
     private ?SymfonyStyle $io = null;
+    private ?object $cachedLogger = null;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -727,28 +728,28 @@ class GeonameImporter
     private function mapRowToData(array $row): array
     {
         $modificationDate = null;
-        if ($row[18] !== '') {
+        if (isset($row[18]) && $row[18] !== '') {
             $date = \DateTime::createFromFormat('Y-m-d', $row[18]);
             $modificationDate = $date ?: null;
         }
 
         return [
             'id' => (int)$row[0],
-            'name' => substr($row[1], 0, 200),
-            'asciiName' => $this->toAscii(substr($row[2], 0, 200)),
-            'alternatenames' => substr($row[3], 0, 10000),
-            'latitude' => (float)$row[4],
-            'longitude' => (float)$row[5],
-            'featureClass' => $row[6] !== '' ? $row[6] : null,
-            'featureCode' => $row[7] !== '' ? substr($row[7], 0, 10) : null,
-            'countryCode' => $row[8] !== '' ? $row[8] : null,
-            'admin1Code' => substr($row[10], 0, 20),
-            'admin2Code' => substr($row[11], 0, 80),
-            'admin3Code' => substr($row[12], 0, 20),
-            'admin4Code' => substr($row[13], 0, 20),
-            'population' => $row[14] !== '' ? $row[14] : null,
-            'elevation' => $row[15] !== '' ? (int)$row[15] : null,
-            'timezone' => substr($row[17], 0, 40),
+            'name' => substr(trim($row[1] ?? ''), 0, 200),
+            'asciiName' => $this->toAscii(substr(trim($row[2] ?? ''), 0, 200)),
+            'alternatenames' => substr($row[3] ?? '', 0, 10000),
+            'latitude' => (float)($row[4] ?? 0),
+            'longitude' => (float)($row[5] ?? 0),
+            'featureClass' => ($row[6] ?? '') !== '' ? $row[6] : null,
+            'featureCode' => ($row[7] ?? '') !== '' ? substr($row[7], 0, 10) : null,
+            'countryCode' => ($row[8] ?? '') !== '' ? $row[8] : null,
+            'admin1Code' => substr($row[10] ?? '', 0, 20),
+            'admin2Code' => substr($row[11] ?? '', 0, 80),
+            'admin3Code' => substr($row[12] ?? '', 0, 20),
+            'admin4Code' => substr($row[13] ?? '', 0, 20),
+            'population' => ($row[14] ?? '') !== '' ? $row[14] : null,
+            'elevation' => ($row[15] ?? '') !== '' ? (int)$row[15] : null,
+            'timezone' => substr($row[17] ?? '', 0, 40),
             'modificationDate' => $modificationDate,
             'isDeleted' => false
         ];
@@ -756,10 +757,16 @@ class GeonameImporter
 
     private function toAscii(string $text): string
     {
+        if ($text === '') {
+            return '';
+        }
         // Transliterate to ASCII and remove non-convertible characters
-        $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+        $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+        if ($converted === false) {
+            return '';
+        }
         // Remove remaining non-ASCII characters just in case
-        return preg_replace('/[^\x20-\x7E]/', '', $text);
+        return (string)preg_replace('/[^\x20-\x7E]/', '', $converted);
     }
 
     private function createImportLog(string $type, string $url): AbstractGeoImport
@@ -835,10 +842,10 @@ class GeonameImporter
             $config->setMiddlewares([]);
         }
 
-        // 3. Force disable DebugStack if it exists (common in Symfony dev)
-        $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
-        if ($logger && property_exists($logger, 'enabled')) {
-            $logger->enabled = false;
+        // 3. Cache and force disable DebugStack if it exists
+        $this->cachedLogger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
+        if ($this->cachedLogger && property_exists($this->cachedLogger, 'enabled')) {
+            $this->cachedLogger->enabled = false;
         }
 
         $this->purgeLogger();
@@ -849,18 +856,25 @@ class GeonameImporter
 
     /**
      * Forcefully clears query logs from the connection configuration.
-     * This is vital to prevent memory exhaustion in dev environments.
      */
     private function purgeLogger(): void
     {
-        $config = $this->em->getConnection()->getConfiguration();
-        $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
-        
-        if ($logger) {
-            if (method_exists($logger, 'clearQueries')) {
-                $logger->clearQueries();
-            } elseif (property_exists($logger, 'queries')) {
-                $logger->queries = [];
+        if ($this->cachedLogger) {
+            if (method_exists($this->cachedLogger, 'clearQueries')) {
+                $this->cachedLogger->clearQueries();
+            } elseif (property_exists($this->cachedLogger, 'queries')) {
+                $this->cachedLogger->queries = [];
+            }
+        } else {
+            // Fallback if not cached
+            $config = $this->em->getConnection()->getConfiguration();
+            $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
+            if ($logger) {
+                if (method_exists($logger, 'clearQueries')) {
+                    $logger->clearQueries();
+                } elseif (property_exists($logger, 'queries')) {
+                    $logger->queries = [];
+                }
             }
         }
     }
@@ -935,11 +949,17 @@ class GeonameImporter
             }
 
             $sql = sprintf(
-                'INSERT INTO %s (%s) VALUES %s',
+                'INSERT %s INTO %s (%s) VALUES %s',
+                (str_contains(strtolower(get_class($platform)), 'mysql') || str_contains(strtolower(get_class($platform)), 'mariadb')) ? 'IGNORE' : '',
                 $platform->quoteIdentifier($tableName),
                 $columnsSql,
                 implode(', ', $placeholders)
             );
+
+            // For PostgreSQL/SQLite we use ON CONFLICT DO NOTHING
+            if (str_contains(strtolower(get_class($platform)), 'postgresql') || str_contains(strtolower(get_class($platform)), 'sqlite')) {
+                $sql .= ' ON CONFLICT DO NOTHING';
+            }
 
             $totalInserted += $conn->executeStatement($sql, $params);
             unset($params);
@@ -1053,8 +1073,15 @@ class GeonameImporter
             $platform->quoteIdentifier($tableName), 
             $platform->quoteIdentifier($pkColumn)
         );
-        $result = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
         
-        return $result->fetchFirstColumn();
+        $result = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+        $found = $result->fetchFirstColumn();
+
+        // Debug for the user if requested or if we are investigating
+        // if ($this->io && empty($found) && !empty($ids)) {
+        //    $this->io->note(sprintf('Search in %s: searched %d IDs, found 0', $tableName, count($ids)));
+        // }
+        
+        return $found;
     }
 }
