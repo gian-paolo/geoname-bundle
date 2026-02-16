@@ -96,6 +96,7 @@ class GeonameImporter
 
                 // Aggressive memory cleanup
                 $this->em->clear();
+                $this->purgeLogger();
                 $batch = null;
                 $results = null;
                 gc_collect_cycles();
@@ -840,8 +841,28 @@ class GeonameImporter
             $logger->enabled = false;
         }
 
+        $this->purgeLogger();
+
         // 4. Clear the Entity Manager
         $this->em->clear();
+    }
+
+    /**
+     * Forcefully clears query logs from the connection configuration.
+     * This is vital to prevent memory exhaustion in dev environments.
+     */
+    private function purgeLogger(): void
+    {
+        $config = $this->em->getConnection()->getConfiguration();
+        $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
+        
+        if ($logger) {
+            if (method_exists($logger, 'clearQueries')) {
+                $logger->clearQueries();
+            } elseif (property_exists($logger, 'queries')) {
+                $logger->queries = [];
+            }
+        }
     }
 
     private function downloadFile(string $url): string
@@ -945,13 +966,14 @@ class GeonameImporter
         $platform = $conn->getDatabasePlatform();
         $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
 
+        $updateCols = $columnMap;
+        unset($updateCols[$pkField]);
+
         $totalUpdated = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
-            $ids = [];
+            $params = [];
             $setClauses = [];
-            
-            $updateCols = $columnMap;
-            unset($updateCols[$pkField]);
+            $pkValues = [];
 
             foreach ($updateCols as $prop => $col) {
                 $colQuoted = $platform->quoteIdentifier($col);
@@ -962,7 +984,7 @@ class GeonameImporter
                 $pkVal = $row[$pkField] ?? null;
                 if ($pkVal === null) continue;
 
-                $ids[] = $conn->quote($pkVal);
+                $pkValues[] = $pkVal;
 
                 foreach ($updateCols as $prop => $col) {
                     $val = $row[$prop] ?? null;
@@ -972,12 +994,13 @@ class GeonameImporter
                         $val = $val ? 1 : 0;
                     }
                     
-                    $quotedVal = ($val === null) ? 'NULL' : $conn->quote($val);
-                    $setClauses[$col] .= sprintf("WHEN %s THEN %s ", $conn->quote($pkVal), $quotedVal);
+                    $setClauses[$col] .= "WHEN ? THEN ? ";
+                    $params[] = $pkVal;
+                    $params[] = $val;
                 }
             }
 
-            if (empty($ids)) continue;
+            if (empty($pkValues)) continue;
 
             $sqlSet = [];
             foreach ($setClauses as $col => $clause) {
@@ -989,13 +1012,20 @@ class GeonameImporter
                 $platform->quoteIdentifier($tableName),
                 implode(', ', $sqlSet),
                 $pkColumnQuoted,
-                implode(', ', $ids)
+                implode(', ', array_fill(0, count($pkValues), '?'))
             );
 
-            $totalUpdated += $conn->executeStatement($sql);
-            unset($ids);
+            // Combine all parameters: those for CASE statements and those for the IN clause
+            $allParams = array_merge($params, $pkValues);
+            $totalUpdated += $conn->executeStatement($sql, $allParams);
+
+            // Explicit cleanup for GC
+            unset($params);
+            unset($pkValues);
+            unset($allParams);
             unset($setClauses);
             unset($sqlSet);
+            gc_collect_cycles();
         }
 
         return $totalUpdated;
