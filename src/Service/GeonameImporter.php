@@ -65,15 +65,21 @@ class GeonameImporter
             }
 
             $totalRead = 0;
-            $totalSaved = 0;
+            $totalInserted = 0;
+            $totalUpdated = 0;
+            $totalSkipped = 0;
             $startTime = microtime(true);
             
             foreach ($this->parser->getBatches($filePath, 250) as $batch) {
                 $batchStart = microtime(true);
                 $totalRead += count($batch);
                 
-                $count = $this->processHybridBatch($batch, $allowedCountries);
-                $totalSaved += $count;
+                $results = $this->processHybridBatch($batch, $allowedCountries);
+                $totalInserted += $results['inserted'];
+                $totalUpdated += $results['updated'];
+                $totalSkipped += $results['skipped'];
+
+                $totalSaved = $totalInserted + $totalUpdated;
                 $this->updateImportLog($importLog, $totalSaved);
                 
                 if ($this->io) {
@@ -81,8 +87,8 @@ class GeonameImporter
                     $batchTime = microtime(true) - $batchStart;
                     $memory = memory_get_usage(true) / 1024 / 1024;
                     $this->io->write(sprintf(
-                        "\r🚀 [%.2fs] Read: %d | Saved: %d | Batch: %.3fs | RAM: %.1fMB",
-                        $elapsed, $totalRead, $totalSaved, $batchTime, $memory
+                        "\r🚀 [%.2fs] Read: %d | Ins: %d | Upd: %d | Skip: %d | Batch: %.3fs | RAM: %.1fMB",
+                        $elapsed, $totalRead, $totalInserted, $totalUpdated, $totalSkipped, $batchTime, $memory
                     ));
                 }
 
@@ -94,7 +100,7 @@ class GeonameImporter
                 }
             }
 
-            $this->completeImportLog($importLog, $totalProcessed);
+            $this->completeImportLog($importLog, $totalInserted + $totalUpdated);
             if (file_exists($filePath)) unlink($filePath);
         } catch (\Throwable $e) {
             $this->failImportLog($importLog, $e->getMessage());
@@ -486,7 +492,8 @@ class GeonameImporter
                     if ($isDelete) {
                         $totalProcessed += $this->processDeleteBatch($batch);
                     } else {
-                        $totalProcessed += $this->processHybridBatch($batch, $allowedCountries);
+                        $results = $this->processHybridBatch($batch, $allowedCountries);
+                        $totalProcessed += ($results['inserted'] + $results['updated']);
                     }
                 }
                 $this->updateImportLog($importLog, $totalProcessed);
@@ -498,16 +505,24 @@ class GeonameImporter
         }
     }
 
-    private function processHybridBatch(array $batch, ?array $allowedCountries): int
+    /**
+     * @return array{inserted: int, updated: int, skipped: int}
+     */
+    private function processHybridBatch(array $batch, ?array $allowedCountries): array
     {
         $toProcess = [];
         $ids = [];
+        $skipped = 0;
 
         foreach ($batch as $row) {
-            if (count($row) < 19) continue;
+            if (count($row) < 19) {
+                $skipped++;
+                continue;
+            }
             
-            $countryCode = strtoupper($row[8] ?? '');
+            $countryCode = strtoupper(trim($row[8] ?? ''));
             if ($allowedCountries !== null && !empty($allowedCountries) && !in_array($countryCode, $allowedCountries, true)) {
+                $skipped++;
                 continue;
             }
 
@@ -516,7 +531,9 @@ class GeonameImporter
             $ids[] = $data['id'];
         }
 
-        if (empty($ids)) return 0;
+        if (empty($ids)) {
+            return ['inserted' => 0, 'updated' => 0, 'skipped' => $skipped];
+        }
 
         $existingIds = $this->findExistingIds($this->geonameEntityClass, $ids);
         
@@ -531,13 +548,14 @@ class GeonameImporter
             }
         }
 
-        $count = 0;
+        $inserted = 0;
+        $updated = 0;
         if (!empty($toInsert)) {
-            $count += $this->bulkInsert($this->geonameEntityClass, $toInsert);
+            $inserted = $this->bulkInsert($this->geonameEntityClass, $toInsert);
             unset($toInsert);
         }
         if (!empty($toUpdate)) {
-            $count += $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
+            $updated = $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
             unset($toUpdate);
         }
 
@@ -546,7 +564,7 @@ class GeonameImporter
         unset($ids);
         unset($existingIds);
 
-        return $count;
+        return ['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped];
     }
 
     private function syncAdminTablesFromBatch(array $batch): void
