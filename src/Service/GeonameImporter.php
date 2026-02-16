@@ -92,12 +92,11 @@ class GeonameImporter
                     ));
                 }
 
-                // Force memory cleanup even if nothing was saved
-                unset($batch);
+                // Aggressive memory cleanup: clear EM and collect garbage every batch
                 $this->em->clear();
-                if ($totalRead % 1000 === 0) {
-                    gc_collect_cycles();
-                }
+                gc_collect_cycles();
+                unset($batch);
+                unset($results);
             }
 
             $this->completeImportLog($importLog, $totalInserted + $totalUpdated);
@@ -523,12 +522,15 @@ class GeonameImporter
             $countryCode = strtoupper(trim($row[8] ?? ''));
             if ($allowedCountries !== null && !empty($allowedCountries) && !in_array($countryCode, $allowedCountries, true)) {
                 $skipped++;
+                // Uncomment for deep debug:
+                // if ($this->io) $this->io->note(sprintf('Skipped %s: country code "%s" not in allowed list', $row[0], $countryCode));
                 continue;
             }
 
             $data = $this->mapRowToData($row);
-            $toProcess[$data['id']] = $data;
-            $ids[] = $data['id'];
+            $id = (int)$data['id'];
+            $toProcess[$id] = $data;
+            $ids[] = $id;
         }
 
         if (empty($ids)) {
@@ -536,12 +538,14 @@ class GeonameImporter
         }
 
         $existingIds = $this->findExistingIds($this->geonameEntityClass, $ids);
+        // Ensure all IDs from database are also cast to integers for reliable comparison
+        $existingIds = array_map('intval', $existingIds);
         
         $toUpdate = [];
         $toInsert = [];
 
         foreach ($toProcess as $id => $data) {
-            if (in_array($id, $existingIds)) {
+            if (in_array($id, $existingIds, true)) {
                 $toUpdate[] = $data;
             } else {
                 $toInsert[] = $data;
@@ -905,6 +909,8 @@ class GeonameImporter
             );
 
             $totalInserted += $conn->executeStatement($sql, $params);
+            unset($params);
+            unset($placeholders);
         }
 
         return $totalInserted;
@@ -975,6 +981,9 @@ class GeonameImporter
             );
 
             $totalUpdated += $conn->executeStatement($sql);
+            unset($ids);
+            unset($setClauses);
+            unset($sqlSet);
         }
 
         return $totalUpdated;
