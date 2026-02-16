@@ -21,6 +21,7 @@ class GeonameImporter
     private array $adminTableNames = [];
     private ?SymfonyStyle $io = null;
     private ?object $cachedLogger = null;
+    private array $memorySnapshots = [];
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -64,6 +65,7 @@ class GeonameImporter
             if ($this->io) {
                 $count = $conn->fetchOne(sprintf("SELECT COUNT(*) FROM %s", $conn->getDatabasePlatform()->quoteIdentifier($this->geonameTableName)));
                 $this->io->note(sprintf('Table %s contains %d records before starting.', $this->geonameTableName, $count));
+                $this->takeMemorySnapshot('START');
             }
 
             $filePath = $this->downloadFile($url);
@@ -103,6 +105,8 @@ class GeonameImporter
                     ));
 
                     if ($iteration % 50 === 0) {
+                        $this->takeMemorySnapshot("BATCH_$iteration");
+                        $this->compareMemorySnapshots('START', "BATCH_$iteration");
                         $this->em->clear();
                         gc_collect_cycles();
                     }
@@ -117,6 +121,54 @@ class GeonameImporter
         } catch (\Throwable $e) {
             $this->failImportLog($importLog, $e->getMessage());
             throw $e;
+        }
+    }
+
+    private function takeMemorySnapshot(string $label): void
+    {
+        $snapshot = [
+            'total' => memory_get_usage(true),
+            'properties' => []
+        ];
+
+        foreach (get_object_vars($this) as $name => $value) {
+            if ($name === 'memorySnapshots') continue;
+            $snapshot['properties'][$name] = $this->estimateSize($value);
+        }
+
+        $this->memorySnapshots[$label] = $snapshot;
+    }
+
+    private function compareMemorySnapshots(string $label1, string $label2): void
+    {
+        if (!isset($this->memorySnapshots[$label1], $this->memorySnapshots[$label2])) return;
+
+        $s1 = $this->memorySnapshots[$label1];
+        $s2 = $this->memorySnapshots[$label2];
+
+        $this->io->newLine();
+        $this->io->writeln(sprintf("<comment>Memory Comparison [%s vs %s]</comment>", $label1, $label2));
+        $diffTotal = ($s2['total'] - $s1['total']) / 1024 / 1024;
+        $this->io->writeln(sprintf("├─ Total RAM Change: <info>%+.2f MB</info>", $diffTotal));
+
+        foreach ($s2['properties'] as $name => $size2) {
+            $size1 = $s1['properties'][$name] ?? 0;
+            if ($size2 > $size1) {
+                $diff = ($size2 - $size1) / 1024;
+                $this->io->writeln(sprintf("├─ Property <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
+            }
+        }
+        $this->io->newLine();
+    }
+
+    private function estimateSize($var): int
+    {
+        try {
+            if (is_resource($var)) return 0;
+            // Use serialization to estimate memory footprint
+            return strlen(@serialize($var));
+        } catch (\Throwable $e) {
+            return 0;
         }
     }
 
