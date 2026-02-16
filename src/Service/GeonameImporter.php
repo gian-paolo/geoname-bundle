@@ -67,6 +67,7 @@ class GeonameImporter
             $totalRead = 0;
             $totalInserted = 0;
             $totalUpdated = 0;
+            $totalModified = 0;
             $totalSkipped = 0;
             $startTime = microtime(true);
             
@@ -77,6 +78,7 @@ class GeonameImporter
                 $results = $this->processHybridBatch($batch, $allowedCountries);
                 $totalInserted += $results['inserted'];
                 $totalUpdated += $results['updated'];
+                $totalModified += $results['modified'];
                 $totalSkipped += $results['skipped'];
 
                 $totalSaved = $totalInserted + $totalUpdated;
@@ -87,16 +89,16 @@ class GeonameImporter
                     $batchTime = microtime(true) - $batchStart;
                     $memory = memory_get_usage(true) / 1024 / 1024;
                     $this->io->write(sprintf(
-                        "\r🚀 [%.2fs] Read: %d | Ins: %d | Upd: %d | Skip: %d | Batch: %.3fs | RAM: %.1fMB",
-                        $elapsed, $totalRead, $totalInserted, $totalUpdated, $totalSkipped, $batchTime, $memory
+                        "\r🚀 [%.2fs] Read: %d | Ins: %d | Upd: %d (%d mod) | Skip: %d | Batch: %.3fs | RAM: %.1fMB",
+                        $elapsed, $totalRead, $totalInserted, $totalUpdated, $totalModified, $totalSkipped, $batchTime, $memory
                     ));
                 }
 
-                // Aggressive memory cleanup: clear EM and collect garbage every batch
+                // Aggressive memory cleanup
                 $this->em->clear();
+                $batch = null;
+                $results = null;
                 gc_collect_cycles();
-                unset($batch);
-                unset($results);
             }
 
             $this->completeImportLog($importLog, $totalInserted + $totalUpdated);
@@ -505,7 +507,7 @@ class GeonameImporter
     }
 
     /**
-     * @return array{inserted: int, updated: int, skipped: int}
+     * @return array{inserted: int, updated: int, modified: int, skipped: int}
      */
     private function processHybridBatch(array $batch, ?array $allowedCountries): array
     {
@@ -522,8 +524,6 @@ class GeonameImporter
             $countryCode = strtoupper(trim($row[8] ?? ''));
             if ($allowedCountries !== null && !empty($allowedCountries) && !in_array($countryCode, $allowedCountries, true)) {
                 $skipped++;
-                // Uncomment for deep debug:
-                // if ($this->io) $this->io->note(sprintf('Skipped %s: country code "%s" not in allowed list', $row[0], $countryCode));
                 continue;
             }
 
@@ -534,11 +534,10 @@ class GeonameImporter
         }
 
         if (empty($ids)) {
-            return ['inserted' => 0, 'updated' => 0, 'skipped' => $skipped];
+            return ['inserted' => 0, 'updated' => 0, 'modified' => 0, 'skipped' => $skipped];
         }
 
         $existingIds = $this->findExistingIds($this->geonameEntityClass, $ids);
-        // Ensure all IDs from database are also cast to integers for reliable comparison
         $existingIds = array_map('intval', $existingIds);
         
         $toUpdate = [];
@@ -552,23 +551,31 @@ class GeonameImporter
             }
         }
 
-        $inserted = 0;
-        $updated = 0;
+        $insertedCount = count($toInsert);
+        $updatedCount = count($toUpdate);
+        $actualModified = 0;
+
         if (!empty($toInsert)) {
-            $inserted = $this->bulkInsert($this->geonameEntityClass, $toInsert);
-            unset($toInsert);
+            $this->bulkInsert($this->geonameEntityClass, $toInsert);
+            $toInsert = null;
         }
         if (!empty($toUpdate)) {
-            $updated = $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
-            unset($toUpdate);
+            $actualModified = $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
+            $toUpdate = null;
         }
 
         $this->syncAdminTablesFromBatch($toProcess);
-        unset($toProcess);
-        unset($ids);
-        unset($existingIds);
+        
+        $toProcess = null;
+        $ids = null;
+        $existingIds = null;
 
-        return ['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped];
+        return [
+            'inserted' => $insertedCount, 
+            'updated' => $updatedCount, 
+            'modified' => $actualModified, 
+            'skipped' => $skipped
+        ];
     }
 
     private function syncAdminTablesFromBatch(array $batch): void
@@ -823,12 +830,17 @@ class GeonameImporter
         }
         
         // 2. Disable Middlewares (DBAL 3+)
-        // This stops the Symfony Debug/Query middleware from collecting SQL strings
         if (method_exists($config, 'setMiddlewares')) {
             $config->setMiddlewares([]);
         }
 
-        // 3. Clear the Entity Manager to free up memory from the UnitOfWork
+        // 3. Force disable DebugStack if it exists (common in Symfony dev)
+        $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
+        if ($logger && property_exists($logger, 'enabled')) {
+            $logger->enabled = false;
+        }
+
+        // 4. Clear the Entity Manager
         $this->em->clear();
     }
 
