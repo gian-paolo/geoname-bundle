@@ -81,18 +81,23 @@ class SyncGeonameCommand extends Command
         // 1. Process Full Imports (GAP or New)
         foreach ($needsFull as $country) {
             $io->note(sprintf('Gap detected for %s. Executing full country import...', $country->getCode()));
+            $countryCode = $country->getCode();
             try {
-                $url = sprintf('https://download.geonames.org/export/dump/%s.zip', strtoupper($country->getCode()));
-                $this->importer->importFull($url, [$country->getCode()]);
+                $url = sprintf('https://download.geonames.org/export/dump/%s.zip', strtoupper($countryCode));
+                $this->importer->importFull($url, [$countryCode]);
                 
-                $country->setLastImportedAt(new \DateTime());
-                $this->em->flush();
+                // Refetch the entity because the EM was cleared during import
+                $countryEntity = $this->em->getRepository($this->countryEntityClass)->find($countryCode);
+                if ($countryEntity) {
+                    $countryEntity->setLastImportedAt(new \DateTime());
+                    $this->em->flush();
+                }
                 
                 // CRITICAL: Clear EM and collect garbage after each country
                 $this->em->clear();
                 gc_collect_cycles();
                 
-                $io->success(sprintf('Full import for %s completed.', $country->getCode()));
+                $io->success(sprintf('Full import for %s completed.', $countryCode));
             } catch (\Exception $e) {
                 $errorMessage = $e->getMessage();
                 if ($output->getVerbosity() >= OutputInterface::VERBOSITY_VERBOSE) {
@@ -109,6 +114,7 @@ class SyncGeonameCommand extends Command
                 $this->importer->importDailyUpdates($yesterday, $needsDaily, !empty($allowedLanguages));
                 
                 foreach ($needsDaily as $code) {
+                    // Refetch entity to ensure it is managed after possible EM clears
                     $country = $this->em->getRepository($this->countryEntityClass)->find($code);
                     if ($country) {
                         $country->setLastImportedAt(new \DateTime());
