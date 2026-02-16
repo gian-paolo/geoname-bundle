@@ -61,6 +61,12 @@ class GeonameImporter
             foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
                 $totalProcessed += $this->processHybridBatch($batch, $allowedCountries);
                 $this->updateImportLog($importLog, $totalProcessed);
+                
+                // Clear memory and trigger garbage collection
+                $this->em->clear();
+                if ($totalProcessed % 5000 === 0) {
+                    gc_collect_cycles();
+                }
             }
 
             $this->completeImportLog($importLog, $totalProcessed);
@@ -747,16 +753,18 @@ class GeonameImporter
         $conn = $this->em->getConnection();
         $config = $conn->getConfiguration();
         
+        // 1. Disable SQLLogger (Legacy DBAL 2)
         if (method_exists($config, 'setSQLLogger')) {
             $config->setSQLLogger(null);
         }
         
-        // Disable modern middlewares (Symfony Debug, etc)
+        // 2. Disable Middlewares (DBAL 3+)
+        // This stops the Symfony Debug/Query middleware from collecting SQL strings
         if (method_exists($config, 'setMiddlewares')) {
             $config->setMiddlewares([]);
         }
 
-        // Also clear the entity manager to free memory
+        // 3. Clear the Entity Manager to free up memory from the UnitOfWork
         $this->em->clear();
     }
 

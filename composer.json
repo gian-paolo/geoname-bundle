@@ -1,6 +1,6 @@
 {
     "name": "pallari/geoname-bundle",
-    "version": "0.6.7",
+    "version": "0.6.8",
     "description": "A Symfony bundle for GeoNames with incremental daily updates support.",
     "type": "symfony-bundle",
     "license": "MIT",
