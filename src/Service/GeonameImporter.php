@@ -559,16 +559,6 @@ class GeonameImporter
             }
 
             $data = $this->mapRowToData($row);
-            
-            // Hard diagnostic stop for the NULL asciiName issue
-            if (!isset($data['asciiName']) || $data['asciiName'] === null) {
-                throw new \RuntimeException(sprintf(
-                    "CRITICAL DATA ERROR: asciiName is NULL.\nRow raw data: %s\nMapped data: %s",
-                    json_encode($row),
-                    json_encode($data)
-                ));
-            }
-
             $id = (int)$data['id'];
             $toProcess[$id] = $data;
             $ids[] = $id;
@@ -1083,20 +1073,31 @@ class GeonameImporter
                 $pkValues[] = $pkVal;
 
                 foreach ($presentProps as $prop => $col) {
+                    $setClauses[$col] .= "WHEN ? THEN ? ";
+                }
+            }
+
+            if (empty($pkValues)) continue;
+
+            // Group parameters by column to match SQL structure
+            // UPDATE table SET col1 = CASE WHEN ? THEN ? END, col2 = CASE WHEN ? THEN ? END WHERE id IN (?, ?)
+            $sqlParams = [];
+            foreach ($presentProps as $prop => $col) {
+                foreach ($chunk as $row) {
+                    $sqlParams[] = $row[$pkField];
                     $val = $row[$prop] ?? null;
                     if ($val instanceof \DateTimeInterface) {
                         $val = $val->format('Y-m-d H:i:s');
                     } elseif (is_bool($val)) {
                         $val = $val ? 1 : 0;
                     }
-                    
-                    $setClauses[$col] .= "WHEN ? THEN ? ";
-                    $params[] = $pkVal;
-                    $params[] = $val;
+                    $sqlParams[] = $val;
                 }
             }
-
-            if (empty($pkValues)) continue;
+            // Add PKs for the WHERE IN clause at the end
+            foreach ($pkValues as $pk) {
+                $sqlParams[] = $pk;
+            }
 
             $sqlSet = [];
             foreach ($setClauses as $col => $clause) {
@@ -1111,12 +1112,10 @@ class GeonameImporter
                 implode(', ', array_fill(0, count($pkValues), '?'))
             );
 
-            $allParams = array_merge($params, $pkValues);
-            $totalUpdated += $this->executeInternal($sql, $allParams);
+            $totalUpdated += $this->executeInternal($sql, $sqlParams);
 
-            unset($params);
+            unset($sqlParams);
             unset($pkValues);
-            unset($allParams);
             unset($setClauses);
             unset($sqlSet);
             gc_collect_cycles();
