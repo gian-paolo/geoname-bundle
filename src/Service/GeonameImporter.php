@@ -508,12 +508,6 @@ class GeonameImporter
         if (file_exists($filePath)) unlink($filePath);
         return $total;
     }
-            }
-        }
-
-        if (file_exists($filePath)) unlink($filePath);
-        return $total;
-    }
 
     private function importIncremental(string $url, string $type, array $allowedCountries = [], bool $isDelete = false, bool $isAlternate = false): void
     {
