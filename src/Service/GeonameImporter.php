@@ -171,7 +171,7 @@ class GeonameImporter
                 $platform->quoteIdentifier($this->hierarchyTableName),
                 implode(', ', $placeholders)
             );
-            $conn->executeStatement($sql, $values);
+            $this->executeInternal($sql, $values);
         }
         
         if (file_exists($filePath)) unlink($filePath);
@@ -358,7 +358,11 @@ class GeonameImporter
                 continue;
             }
             
-            $conn->executeStatement($sql, $values);
+            } else {
+                continue;
+            }
+            
+            $this->executeInternal($sql, $values);
         }
         
         unlink($filePath);
@@ -385,7 +389,7 @@ class GeonameImporter
             str_contains($level, '1') ? $platform->quoteIdentifier('admin1_code') : $platform->quoteIdentifier('admin2_code')
         );
 
-        return $conn->executeQuery($sql, [$allowedCountries], [\Doctrine\DBAL\ArrayParameterType::STRING])->fetchFirstColumn();
+        return $this->fetchAllInternal($sql, [$allowedCountries]);
     }
 
     public function syncAdminTablesFromTable(array $allowedCountries = []): array
@@ -441,7 +445,7 @@ class GeonameImporter
                     $importTableQuoted, $whereSql, $colsList
                 );
             }
-            $inserted = $conn->executeStatement($sqlInsert);
+            $inserted = $this->executeInternal($sqlInsert, []);
 
             // 2. Update existing records
             $joinOn = implode(' AND ', array_map(fn($c) => "t." . $platform->quoteIdentifier($c) . " = g." . $platform->quoteIdentifier($c), $cols));
@@ -463,7 +467,7 @@ class GeonameImporter
                     $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql
                 );
             }
-            $updated = $conn->executeStatement($sqlUpdate);
+            $updated = $this->executeInternal($sqlUpdate, []);
             
             $stats[$level] = $inserted + $updated;
         }
@@ -486,18 +490,28 @@ class GeonameImporter
         foreach ($this->parser->getBatches($filePath, 2000) as $batch) {
             $sql = sprintf("UPDATE %s SET admin5_code = CASE geonameid ", $platform->quoteIdentifier($tableName));
             $ids = [];
+            $values = [];
             foreach ($batch as $row) {
                 if (count($row) < 2) continue;
                 $id = (int)$row[0];
                 $code = $row[1];
-                $sql .= "WHEN {$id} THEN " . $conn->quote($code) . " ";
+                $sql .= "WHEN ? THEN ? ";
+                $values[] = $id;
+                $values[] = $code;
                 $ids[] = $id;
                 $total++;
             }
-            $sql .= "END WHERE geonameid IN (" . implode(',', $ids) . ")";
+            $sql .= "END WHERE geonameid IN (" . implode(',', array_fill(0, count($ids), '?')) . ")";
             
             if (!empty($ids)) {
-                $conn->executeStatement($sql);
+                $allParams = array_merge($values, $ids);
+                $this->executeInternal($sql, $allParams);
+            }
+        }
+
+        if (file_exists($filePath)) unlink($filePath);
+        return $total;
+    }
             }
         }
 
@@ -716,7 +730,7 @@ class GeonameImporter
             } else {
                 continue;
             }
-            $conn->executeStatement($sql, $values);
+            $this->executeInternal($sql, $values);
         }
     }
 
