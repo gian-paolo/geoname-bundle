@@ -768,12 +768,10 @@ class GeonameImporter
         }
 
         $name = substr(trim((string)($row[1] ?? '')), 0, 200);
-        $asciiName = substr(trim((string)($row[2] ?? '')), 0, 200);
+        $rawAsciiName = trim((string)($row[2] ?? ''));
         
-        // If asciiName is empty, fallback to name converted to ASCII
-        if ($asciiName === '') {
-            $asciiName = $this->toAscii($name);
-        }
+        // Always force toAscii even if the file claims it is already ASCII
+        $asciiName = $this->toAscii($rawAsciiName !== '' ? $rawAsciiName : $name);
         
         // Final ultimate protection against null/empty for non-nullable DB columns
         if ($name === '') $name = 'Unknown';
@@ -782,7 +780,7 @@ class GeonameImporter
         return [
             'id' => (int)$row[0],
             'name' => $name,
-            'asciiName' => $asciiName,
+            'asciiName' => substr($asciiName, 0, 200),
             'alternatenames' => substr((string)($row[3] ?? ''), 0, 10000),
             'latitude' => (float)($row[4] ?? 0),
             'longitude' => (float)($row[5] ?? 0),
