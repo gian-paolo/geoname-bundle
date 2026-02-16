@@ -559,6 +559,16 @@ class GeonameImporter
             }
 
             $data = $this->mapRowToData($row);
+            
+            // Hard diagnostic stop for the NULL asciiName issue
+            if (!isset($data['asciiName']) || $data['asciiName'] === null) {
+                throw new \RuntimeException(sprintf(
+                    "CRITICAL DATA ERROR: asciiName is NULL.\nRow raw data: %s\nMapped data: %s",
+                    json_encode($row),
+                    json_encode($data)
+                ));
+            }
+
             $id = (int)$data['id'];
             $toProcess[$id] = $data;
             $ids[] = $id;
