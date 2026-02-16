@@ -41,6 +41,13 @@ class GeonameImporter
         $this->geonameEntityClass = $geonameEntityClass;
         $this->importEntityClass = $importEntityClass;
         $this->alternateNameEntityClass = $alternateNameEntityClass;
+
+        // Auto-detect correct table names from Doctrine metadata to ensure prefixes/mappings are perfect
+        $this->geonameTableName = $this->em->getClassMetadata($geonameEntityClass)->getTableName();
+        $this->importTableName = $this->em->getClassMetadata($importEntityClass)->getTableName();
+        if ($alternateNameEntityClass) {
+            $this->alternateNameTableName = $this->em->getClassMetadata($alternateNameEntityClass)->getTableName();
+        }
     }
 
     public function setAdminTableNames(array $tables): void
@@ -756,10 +763,14 @@ class GeonameImporter
         $name = substr(trim((string)($row[1] ?? '')), 0, 200);
         $asciiName = substr(trim((string)($row[2] ?? '')), 0, 200);
         
-        // If asciiName is empty but name is not, try to use name
-        if ($asciiName === '' && $name !== '') {
+        // If asciiName is empty, fallback to name converted to ASCII
+        if ($asciiName === '') {
             $asciiName = $this->toAscii($name);
         }
+        
+        // Final ultimate protection against null/empty for non-nullable DB columns
+        if ($name === '') $name = 'Unknown';
+        if ($asciiName === '') $asciiName = 'Unknown';
 
         return [
             'id' => (int)$row[0],
