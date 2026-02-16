@@ -1163,16 +1163,31 @@ class GeonameImporter
         $snapshot = [
             'total' => memory_get_usage(true),
             'properties' => [],
-            'locals' => []
+            'locals' => [],
+            'globals' => []
         ];
 
+        // Object properties
         foreach (get_object_vars($this) as $name => $value) {
             if ($name === 'memorySnapshots') continue;
             $snapshot['properties'][$name] = $this->estimateSize($value);
         }
 
+        // Local variables
         foreach ($localVars as $name => $value) {
             $snapshot['locals'][$name] = $this->estimateSize($value);
+        }
+
+        // External/Global variables
+        $skipGlobals = ['GLOBALS', '_SERVER', '_ENV', 'memorySnapshots', 'composerLoader', 'argv', 'argc'];
+        foreach ($GLOBALS as $name => $value) {
+            if (in_array($name, $skipGlobals, true)) continue;
+            if ($value === $this) continue; // Avoid self-reference
+            
+            $size = $this->estimateSize($value);
+            if ($size > 1024) { // Only track things larger than 1KB to avoid noise
+                $snapshot['globals'][$name] = $size;
+            }
         }
         
         $this->memorySnapshots[$label] = $snapshot;
@@ -1207,11 +1222,20 @@ class GeonameImporter
                 $this->io->writeln(sprintf("├─ Local Var <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
             }
         }
+
+        // Globals/External comparison
+        foreach ($s2['globals'] as $name => $size2) {
+            $size1 = $s1['globals'][$name] ?? 0;
+            if ($size2 > $size1) {
+                $diff = ($size2 - $size1) / 1024;
+                $this->io->writeln(sprintf("├─ External/Global <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
+            }
+        }
         
         // Final check on global growth
-        if (abs($diffTotal) > 1 && empty(array_filter($s2['properties'], fn($v, $k) => ($v - ($s1['properties'][$k] ?? 0)) > 10240, ARRAY_FILTER_USE_BOTH))) {
-            $this->io->writeln("├─ <error>WARNING:</error> RAM grew significantly but no internal property growth detected.");
-            $this->io->writeln("│  This suggests the leak is in external services (Doctrine Logger, Profiler, etc.)");
+        if (abs($diffTotal) > 1 && empty($snapshot['globals'] ?? []) && empty($snapshot['properties'] ?? [])) {
+            $this->io->writeln("├─ <error>WARNING:</error> RAM grew significantly but no variable growth detected.");
+            $this->io->writeln("│  This indicates hidden internal PHP buffers or native extension leaks.");
         }
         $this->io->newLine();
     }
