@@ -122,6 +122,7 @@ class GeonameImporter
                         $this->takeMemorySnapshot("BATCH_$iteration", get_defined_vars());
                         $this->compareMemorySnapshots('START', "BATCH_$iteration");
                         $this->em->clear();
+                        if (function_exists('gc_mem_caches')) gc_mem_caches();
                         gc_collect_cycles();
                     }
                 }

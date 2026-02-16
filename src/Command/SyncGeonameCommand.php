@@ -86,16 +86,18 @@ class SyncGeonameCommand extends Command
                 $url = sprintf('https://download.geonames.org/export/dump/%s.zip', strtoupper($countryCode));
                 $this->importer->importFull($url, [$countryCode]);
                 
-                // Refetch the entity because the EM was cleared during import
-                $countryEntity = $this->em->getRepository($this->countryEntityClass)->find($countryCode);
-                if ($countryEntity) {
-                    $countryEntity->setLastImportedAt(new \DateTime());
-                    $this->em->flush();
-                }
+                // Use direct SQL to update the date, bypassing EM clear/detach issues
+                $conn = $this->em->getConnection();
+                $countryTable = $this->em->getClassMetadata($this->countryEntityClass)->getTableName();
+                $conn->executeStatement(
+                    sprintf("UPDATE %s SET last_imported_at = ? WHERE code = ?", $conn->getDatabasePlatform()->quoteIdentifier($countryTable)),
+                    [(new \DateTime())->format('Y-m-d H:i:s'), $countryCode]
+                );
                 
                 // CRITICAL: Clear EM and collect garbage after each country
                 $this->em->clear();
                 gc_collect_cycles();
+                if (function_exists('gc_mem_caches')) gc_mem_caches();
                 
                 $io->success(sprintf('Full import for %s completed.', $countryCode));
             } catch (\Exception $e) {
@@ -113,14 +115,14 @@ class SyncGeonameCommand extends Command
             try {
                 $this->importer->importDailyUpdates($yesterday, $needsDaily, !empty($allowedLanguages));
                 
+                $conn = $this->em->getConnection();
+                $countryTable = $this->em->getClassMetadata($this->countryEntityClass)->getTableName();
                 foreach ($needsDaily as $code) {
-                    // Refetch entity to ensure it is managed after possible EM clears
-                    $country = $this->em->getRepository($this->countryEntityClass)->find($code);
-                    if ($country) {
-                        $country->setLastImportedAt(new \DateTime());
-                    }
+                    $conn->executeStatement(
+                        sprintf("UPDATE %s SET last_imported_at = ? WHERE code = ?", $conn->getDatabasePlatform()->quoteIdentifier($countryTable)),
+                        [(new \DateTime())->format('Y-m-d H:i:s'), $code]
+                    );
                 }
-                $this->em->flush();
                 $io->success('Daily updates completed.');
             } catch (\Exception $e) {
                 $io->error('Failed daily updates: ' . $e->getMessage());
