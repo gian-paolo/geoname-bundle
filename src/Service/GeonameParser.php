@@ -7,7 +7,7 @@ class GeonameParser
     /**
      * @param string $filePath
      * @param int $batchSize
-     * @return \Generator<array<int, mixed>>
+     * @return \Generator<array<int, array>>
      */
     public function getBatches(string $filePath, int $batchSize = 1000): \Generator
     {
@@ -17,38 +17,22 @@ class GeonameParser
         }
 
         $batch = [];
-        $count = 0;
-
-        while (($data = fgetcsv($handle, 0, "	", "\"", "")) !== false) {
+        while (($line = fgets($handle)) !== false) {
+            $data = explode("\t", rtrim($line, "\r\n"));
             $batch[] = $data;
-            $count++;
 
-            if ($count >= $batchSize) {
+            if (count($batch) >= $batchSize) {
                 yield $batch;
                 $batch = [];
-                $count = 0;
+                // Suggest GC after yielding a batch
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
             }
         }
 
         if (!empty($batch)) {
             yield $batch;
-        }
-
-        fclose($handle);
-    }
-
-    /**
-     * Helper to read a single row at a time if needed
-     */
-    public function getRows(string $filePath): \Generator
-    {
-        $handle = fopen($filePath, 'r');
-        if (!$handle) {
-            throw new \RuntimeException(sprintf('Could not open file: %s', $filePath));
-        }
-
-        while (($data = fgetcsv($handle, 0, "	", "\"", "")) !== false) {
-            yield $data;
         }
 
         fclose($handle);

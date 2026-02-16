@@ -1063,10 +1063,18 @@ class GeonameImporter
     private function findExistingIds(string $entityClass, array $ids): array
     {
         $conn = $this->em->getConnection();
-        $metadata = $this->em->getClassMetadata($entityClass);
-        $tableName = $metadata->getTableName();
-        $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
         $platform = $conn->getDatabasePlatform();
+        
+        // Use the explicitly set table name which includes prefixes
+        $tableName = $this->geonameTableName;
+        
+        // If we are searching for alternate names, use that table
+        if (str_contains($entityClass, 'AlternateName')) {
+            $tableName = $this->alternateNameTableName;
+        }
+
+        $metadata = $this->em->getClassMetadata($entityClass);
+        $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
 
         $sql = sprintf("SELECT %s FROM %s WHERE %s IN (?)", 
             $platform->quoteIdentifier($pkColumn), 
@@ -1074,13 +1082,19 @@ class GeonameImporter
             $platform->quoteIdentifier($pkColumn)
         );
         
-        $result = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-        $found = $result->fetchFirstColumn();
+        $found = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER])->fetchFirstColumn();
+        $found = array_map('intval', $found);
 
-        // Debug for the user if requested or if we are investigating
-        // if ($this->io && empty($found) && !empty($ids)) {
-        //    $this->io->note(sprintf('Search in %s: searched %d IDs, found 0', $tableName, count($ids)));
-        // }
+        // Debug: if we are searching but nothing is found, check if table is actually empty
+        if (empty($found) && !empty($ids) && $this->io) {
+            $checkSql = sprintf("SELECT COUNT(*) FROM %s LIMIT 1", $platform->quoteIdentifier($tableName));
+            $count = (int)$conn->fetchOne($checkSql);
+            if ($count > 0) {
+                 // The table is NOT empty, but we found nothing. This is a match problem.
+                 // Let's log it only once per batch to avoid noise.
+                 // $this->io->note(sprintf('Match issue: %d IDs searched in %s (non-empty), 0 found. First ID searched: %s', count($ids), $tableName, $ids[0]));
+            }
+        }
         
         return $found;
     }
