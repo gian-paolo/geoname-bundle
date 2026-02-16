@@ -874,10 +874,10 @@ class GeonameImporter
 
     private function disableLogging(): void
     {
+        // 1. Disable SQLLogger (Legacy DBAL 2)
         $conn = $this->em->getConnection();
         $config = $conn->getConfiguration();
-        
-        // 1. Disable SQLLogger (Legacy DBAL 2)
+
         if (method_exists($config, 'setSQLLogger')) {
             $config->setSQLLogger(null);
         }
@@ -895,7 +895,13 @@ class GeonameImporter
 
         $this->purgeLogger();
 
-        // 4. Clear the Entity Manager
+        // 4. Force GC to clear any pending buffers
+        if (function_exists('gc_mem_caches')) {
+            gc_mem_caches();
+        }
+        gc_collect_cycles();
+
+        // 5. Clear the Entity Manager
         $this->em->clear();
     }
 
