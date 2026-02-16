@@ -94,7 +94,11 @@ class SyncGeonameCommand extends Command
                 
                 $io->success(sprintf('Full import for %s completed.', $country->getCode()));
             } catch (\Exception $e) {
-                $io->error(sprintf('Failed full import for %s: %s', $country->getCode(), $e->getMessage()));
+                $errorMessage = $e->getMessage();
+                if ($output->getVerbosity() >= OutputInterface::VERBOSITY_VERBOSE) {
+                    $errorMessage .= "\n" . $e->getTraceAsString();
+                }
+                $io->error(sprintf('Failed full import for %s: %s', $country->getCode(), $errorMessage));
             }
         }
 

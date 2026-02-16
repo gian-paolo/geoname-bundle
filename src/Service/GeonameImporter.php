@@ -133,7 +133,8 @@ class GeonameImporter
             $this->completeImportLog($importLog, $totalInserted + $totalUpdated);
             if (file_exists($filePath)) unlink($filePath);
         } catch (\Throwable $e) {
-            $this->failImportLog($importLog, $e->getMessage());
+            $errorDetail = sprintf("%s\n\nStack Trace:\n%s", $e->getMessage(), $e->getTraceAsString());
+            $this->failImportLog($importLog, $errorDetail);
             throw $e;
         }
     }
@@ -531,7 +532,8 @@ class GeonameImporter
             $this->completeImportLog($importLog, $totalProcessed);
             if (file_exists($filePath)) unlink($filePath);
         } catch (\Throwable $e) {
-            $this->failImportLog($importLog, $e->getMessage());
+            $errorDetail = sprintf("%s\n\nStack Trace:\n%s", $e->getMessage(), $e->getTraceAsString());
+            $this->failImportLog($importLog, $errorDetail);
         }
     }
 
@@ -854,6 +856,8 @@ class GeonameImporter
         if (!$this->em->isOpen()) return;
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
+        
+        // Ensure error is a string and potentially contains stack trace
         $conn->executeStatement(
             sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", 
                 $platform->quoteIdentifier($this->importTableName),
@@ -862,7 +866,7 @@ class GeonameImporter
                 $platform->quoteIdentifier('ended_at'),
                 $platform->quoteIdentifier('id')
             ),
-            [AbstractGeoImport::STATUS_FAILED, $error, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
+            [AbstractGeoImport::STATUS_FAILED, substr($error, 0, 65535), (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
         );
     }
 
