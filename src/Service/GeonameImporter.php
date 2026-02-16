@@ -1090,8 +1090,7 @@ class GeonameImporter
 
             $sqlSet = [];
             foreach ($setClauses as $col => $clause) {
-                $colQuoted = $platform->quoteIdentifier($col);
-                $sqlSet[] = $clause . " ELSE $colQuoted END";
+                $sqlSet[] = $clause . " END";
             }
 
             $sql = sprintf(
