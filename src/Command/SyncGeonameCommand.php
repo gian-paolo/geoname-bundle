@@ -89,12 +89,13 @@ class SyncGeonameCommand extends Command
                 $url = sprintf('https://download.geonames.org/export/dump/%s.zip', strtoupper($country->getCode()));
                 $this->importer->importFull($url, [$country->getCode()]);
                 
-                // If alternate names are enabled, we might need a full import for alternate names too
-                // For simplicity, we assume if we do a full country import, we might want to refresh alternate names
-                // though usually they are in a single global file.
-                
                 $country->setLastImportedAt(new \DateTime());
                 $this->em->flush();
+                
+                // CRITICAL: Clear EM and collect garbage after each country
+                $this->em->clear();
+                gc_collect_cycles();
+                
                 $io->success(sprintf('Full import for %s completed.', $country->getCode()));
             } catch (\Exception $e) {
                 $io->error(sprintf('Failed full import for %s: %s', $country->getCode(), $e->getMessage()));

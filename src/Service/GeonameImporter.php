@@ -79,7 +79,7 @@ class GeonameImporter
             $startTime = microtime(true);
             
             $iteration = 0;
-            foreach ($this->parser->getBatches($filePath, 250) as $batch) {
+            foreach ($this->parser->getBatches($filePath, 100) as $batch) {
                 $iteration++;
                 $batchStart = microtime(true);
                 $totalRead += count($batch);
@@ -770,23 +770,31 @@ class GeonameImporter
             $modificationDate = $date ?: null;
         }
 
+        $name = substr(trim((string)($row[1] ?? '')), 0, 200);
+        $asciiName = substr(trim((string)($row[2] ?? '')), 0, 200);
+        
+        // If asciiName is empty but name is not, try to use name
+        if ($asciiName === '' && $name !== '') {
+            $asciiName = $this->toAscii($name);
+        }
+
         return [
             'id' => (int)$row[0],
-            'name' => substr(trim($row[1] ?? ''), 0, 200),
-            'asciiName' => $this->toAscii(substr(trim($row[2] ?? ''), 0, 200)),
-            'alternatenames' => substr($row[3] ?? '', 0, 10000),
+            'name' => $name,
+            'asciiName' => $asciiName,
+            'alternatenames' => substr((string)($row[3] ?? ''), 0, 10000),
             'latitude' => (float)($row[4] ?? 0),
             'longitude' => (float)($row[5] ?? 0),
-            'featureClass' => ($row[6] ?? '') !== '' ? $row[6] : null,
-            'featureCode' => ($row[7] ?? '') !== '' ? substr($row[7], 0, 10) : null,
-            'countryCode' => ($row[8] ?? '') !== '' ? $row[8] : null,
-            'admin1Code' => substr($row[10] ?? '', 0, 20),
-            'admin2Code' => substr($row[11] ?? '', 0, 80),
-            'admin3Code' => substr($row[12] ?? '', 0, 20),
-            'admin4Code' => substr($row[13] ?? '', 0, 20),
-            'population' => ($row[14] ?? '') !== '' ? $row[14] : null,
+            'featureClass' => ($row[6] ?? '') !== '' ? substr((string)$row[6], 0, 1) : null,
+            'featureCode' => ($row[7] ?? '') !== '' ? substr((string)$row[7], 0, 10) : null,
+            'countryCode' => ($row[8] ?? '') !== '' ? substr(strtoupper((string)$row[8]), 0, 2) : null,
+            'admin1Code' => substr((string)($row[10] ?? ''), 0, 20),
+            'admin2Code' => substr((string)($row[11] ?? ''), 0, 80),
+            'admin3Code' => substr((string)($row[12] ?? ''), 0, 20),
+            'admin4Code' => substr((string)($row[13] ?? ''), 0, 20),
+            'population' => ($row[14] ?? '') !== '' ? (string)$row[14] : null,
             'elevation' => ($row[15] ?? '') !== '' ? (int)$row[15] : null,
-            'timezone' => substr($row[17] ?? '', 0, 40),
+            'timezone' => substr((string)($row[17] ?? ''), 0, 40),
             'modificationDate' => $modificationDate,
             'isDeleted' => false
         ];
