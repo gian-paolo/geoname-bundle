@@ -50,22 +50,11 @@ class SyncGeonameCommand extends Command
         $countries = $this->em->getRepository($this->countryEntityClass)->findBy(['isEnabled' => true]);
 
         if (empty($countries)) {
-            $io->warning('No enabled countries found.');
+            $io->warning('No enabled countries found in entity: ' . $this->countryEntityClass);
             return Command::SUCCESS;
         }
 
-        // Get enabled languages from DB if alternate names are enabled
-        $allowedLanguages = [];
-        if ($this->alternateNamesEnabled) {
-            $languages = $this->em->getRepository($this->languageEntityClass)->findBy(['isEnabled' => true]);
-            $allowedLanguages = array_map(fn($l) => $l->getCode(), $languages);
-            
-            if (empty($allowedLanguages)) {
-                $io->note('Alternate names enabled but no languages enabled in DB. Alternate names will be skipped.');
-            } else {
-                $io->note(sprintf('Alternate names will be synced for languages: %s', implode(', ', $allowedLanguages)));
-            }
-        }
+        $io->note(sprintf('Found %d enabled countries.', count($countries)));
 
         $yesterday = new \DateTime('yesterday');
         $needsFull = [];
@@ -73,13 +62,20 @@ class SyncGeonameCommand extends Command
 
         foreach ($countries as $country) {
             $lastImport = $country->getLastImportedAt();
+            $status = $lastImport ? $lastImport->format('Y-m-d') : 'NEVER';
             
             // GAP Detection
             if ($lastImport === null || $lastImport->format('Y-m-d') < $yesterday->format('Y-m-d')) {
                 $needsFull[] = $country;
+                // $io->writeln(sprintf('  - %s: FULL NEEDED (Last: %s)', $country->getCode(), $status));
             } else {
                 $needsDaily[] = $country->getCode();
+                // $io->writeln(sprintf('  - %s: DAILY ONLY (Last: %s)', $country->getCode(), $status));
             }
+        }
+
+        if (empty($needsFull) && empty($needsDaily)) {
+            $io->warning('No countries identified for import after logic check.');
         }
 
         // 1. Process Full Imports (GAP or New)
