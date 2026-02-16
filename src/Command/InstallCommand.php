@@ -109,6 +109,9 @@ class InstallCommand extends Command
         $useFulltext = $io->confirm('Enable Full-Text search? (Requires MySQL/PostgreSQL)', true);
         $fulltextString = $useFulltext ? 'true' : 'false';
 
+        $enableAdmin5 = $io->confirm('Enable Admin5 support? (Sub-municipal divisions, used in countries like France or Belgium)', false);
+        $admin5String = $enableAdmin5 ? 'true' : 'false';
+
         $namespace = rtrim($namespace, '\\');
 
         $content = <<<YAML
@@ -135,7 +138,7 @@ pallari_geoname:
     alternate_names:
         enabled: true
     admin5:
-        enabled: false
+        enabled: $admin5String
 
     # Database naming
     table_prefix: 'geoname_'

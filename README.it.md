@@ -153,6 +153,23 @@ php bin/console pallari:geoname:sync
 
 ---
 
+## 🗺️ Mappatura Livelli Amministrativi
+
+GeoNames organizza i dati in 5 livelli amministrativi (da Admin1 a Admin5). Il significato di questi livelli varia drasticamente da paese a paese. Ecco alcuni esempi comuni:
+
+| Paese | Admin1 (ADM1) | Admin2 (ADM2) | Admin3 (ADM3) | Admin4 (ADM4) | Admin5 (ADM5) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Italia (IT)** | Regioni | Province | Comuni | Località/Frazioni (raro) | - |
+| **USA (US)** | Stati | Contee | - | - | - |
+| **Francia (FR)** | Regioni | Dipartimenti | Arrondissement | Comuni | Cantoni |
+| **Germania (DE)** | Stati (Länder) | Distretti Amm. | Circondari (Kreise) | Comuni | - |
+| **Spagna (ES)** | Comunità Auton. | Province | Comuni | - | - |
+| **Regno Unito (GB)** | Nazioni (Inghilterra...) | Contee | - | - | - |
+
+> **Nota su Admin5**: Il supporto per Admin5 è disabilitato di default poiché è utilizzato solo in pochissimi paesi (come Francia o Belgio) per suddivisioni molto capillari. Se ne hai bisogno, abilitalo nella configurazione ed esegui l'importazione specifica per Admin5.
+
+---
+
 ## 🔍 Ricerca dei Dati
 
 Il bundle offre un servizio `GeonameSearchService` ad alte prestazioni per trovare città e località con il loro contesto amministrativo (regioni, province).

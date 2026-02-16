@@ -155,6 +155,23 @@ php bin/console pallari:geoname:sync
 
 ---
 
+## 🗺️ Administrative Hierarchies
+
+GeoNames organizes data into 5 administrative levels (Admin1 to Admin5). The meaning of these levels varies by country. Here are some common examples:
+
+| Country | Admin1 (ADM1) | Admin2 (ADM2) | Admin3 (ADM3) | Admin4 (ADM4) | Admin5 (ADM5) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Italy (IT)** | Regions | Provinces | Municipalities | Districts (rare) | - |
+| **USA (US)** | States | Counties | - | - | - |
+| **France (FR)** | Regions | Departments | Arrondissements | Communes | Cantons |
+| **Germany (DE)** | States (Länder) | Adm. Districts | Districts (Kreise) | Municipalities | - |
+| **Spain (ES)** | Auton. Communities | Provinces | Municipalities | - | - |
+| **UK (GB)** | Countries | Counties | - | - | - |
+
+> **Note on Admin5**: Support for Admin5 is disabled by default as it is only used in a few countries (like France or Belgium) for very granular subdivisions. If you need it, make sure to enable it in your configuration and run the Admin5 import.
+
+---
+
 ## 🔍 Searching for Data
 
 The bundle provides a high-performance `GeonameSearchService` to find cities and places with their administrative context (regions, provinces).

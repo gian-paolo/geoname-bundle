@@ -63,6 +63,10 @@ services:
             $countryEntityClass: '%pallari_geoname.entities.country%'
             $admin1EntityClass: '%pallari_geoname.entities.admin1%'
             $admin2EntityClass: '%pallari_geoname.entities.admin2%'
+            $admin3EntityClass: '%pallari_geoname.entities.admin3%'
+            $admin4EntityClass: '%pallari_geoname.entities.admin4%'
+            $admin5EntityClass: '%pallari_geoname.entities.admin5%'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
         tags: ['console.command']
 
     Pallari\GeonameBundle\EventListener\TablePrefixListener:

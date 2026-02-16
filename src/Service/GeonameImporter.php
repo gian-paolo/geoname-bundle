@@ -95,7 +95,7 @@ class GeonameImporter
             $startTime = microtime(true);
             
             $iteration = 0;
-            foreach ($this->parser->getBatches($filePath, 100) as $batch) {
+            foreach ($this->parser->getBatches($filePath, 500) as $batch) {
                 $iteration++;
                 $batchStart = microtime(true);
                 $totalRead += count($batch);
@@ -517,7 +517,7 @@ class GeonameImporter
         try {
             $filePath = $this->downloadFile($url);
             $totalProcessed = 0;
-            foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
+            foreach ($this->parser->getBatches($filePath, 500) as $batch) {
                 if ($isAlternate) {
                     if ($isDelete) {
                         $totalProcessed += $this->processAlternateDeleteBatch($batch);
