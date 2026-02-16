@@ -45,6 +45,8 @@ class SyncGeonameCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $io->title('GeoNames Synchronization');
 
+        $this->importer->setOutput($io);
+
         $countries = $this->em->getRepository($this->countryEntityClass)->findBy(['isEnabled' => true]);
 
         if (empty($countries)) {

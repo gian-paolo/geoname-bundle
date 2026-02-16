@@ -7,6 +7,7 @@ use Pallari\GeonameBundle\Entity\AbstractGeoImport;
 use Pallari\GeonameBundle\Entity\AbstractGeoName;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 class GeonameImporter
 {
@@ -18,6 +19,7 @@ class GeonameImporter
     private string $hierarchyTableName = 'geohierarchy';
     private string $alternateNameTableName = 'geoalternatename';
     private array $adminTableNames = [];
+    private ?SymfonyStyle $io = null;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -25,6 +27,11 @@ class GeonameImporter
         private GeonameParser $parser,
         private string $tmpDir
     ) {}
+
+    public function setOutput(SymfonyStyle $io): void
+    {
+        $this->io = $io;
+    }
 
     public function setEntityClasses(string $geonameEntityClass, string $importEntityClass, string $alternateNameEntityClass = ''): void
     {
@@ -58,10 +65,24 @@ class GeonameImporter
             }
 
             $totalProcessed = 0;
+            $startTime = microtime(true);
+            
             foreach ($this->parser->getBatches($filePath, 250) as $batch) {
-                $totalProcessed += $this->processHybridBatch($batch, $allowedCountries);
+                $batchStart = microtime(true);
+                $count = $this->processHybridBatch($batch, $allowedCountries);
+                $totalProcessed += $count;
                 $this->updateImportLog($importLog, $totalProcessed);
                 
+                if ($this->io && $totalProcessed % 1000 === 0) {
+                    $elapsed = microtime(true) - $startTime;
+                    $batchTime = microtime(true) - $batchStart;
+                    $memory = memory_get_usage(true) / 1024 / 1024;
+                    $this->io->text(sprintf(
+                        "🚀 [%.2fs] Processed: %d | Last batch: %.3fs | RAM: %.1fMB",
+                        $elapsed, $totalProcessed, $batchTime, $memory
+                    ));
+                }
+
                 // Clear memory and trigger garbage collection
                 $this->em->clear();
                 if ($totalProcessed % 2500 === 0) {
@@ -680,7 +701,7 @@ class GeonameImporter
         return [
             'id' => (int)$row[0],
             'name' => substr($row[1], 0, 200),
-            'asciiName' => substr($row[2], 0, 200),
+            'asciiName' => $this->toAscii(substr($row[2], 0, 200)),
             'alternatenames' => substr($row[3], 0, 10000),
             'latitude' => (float)$row[4],
             'longitude' => (float)$row[5],
@@ -697,6 +718,14 @@ class GeonameImporter
             'modificationDate' => $modificationDate,
             'isDeleted' => false
         ];
+    }
+
+    private function toAscii(string $text): string
+    {
+        // Transliterate to ASCII and remove non-convertible characters
+        $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+        // Remove remaining non-ASCII characters just in case
+        return preg_replace('/[^\x20-\x7E]/', '', $text);
     }
 
     private function createImportLog(string $type, string $url): AbstractGeoImport
@@ -779,6 +808,7 @@ class GeonameImporter
 
     private function downloadFile(string $url): string
     {
+        if ($this->io) $this->io->text("⬇️  Downloading: $url");
         if (!is_dir($this->tmpDir)) mkdir($this->tmpDir, 0777, true);
         $tempFile = $this->tmpDir . DIRECTORY_SEPARATOR . uniqid('geoname_', true);
         
@@ -796,6 +826,7 @@ class GeonameImporter
 
     private function unzip(string $zipPath): string
     {
+        if ($this->io) $this->io->text("📦 Decompressing file...");
         $zip = new \ZipArchive();
         if ($zip->open($zipPath) === true) {
             $extractDir = $this->tmpDir . DIRECTORY_SEPARATOR . uniqid('extract_', true);
