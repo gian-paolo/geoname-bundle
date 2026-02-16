@@ -30,6 +30,7 @@ class PallariGeonameExtension extends Extension
         $container->setParameter('pallari_geoname.alternate_names.enabled', $config['alternate_names']['enabled']);
         $container->setParameter('pallari_geoname.admin5.enabled', $config['admin5']['enabled']);
         $container->setParameter('pallari_geoname.search.use_fulltext', $config['search']['use_fulltext']);
+        $container->setParameter('pallari_geoname.debug', $container->getParameter('kernel.debug'));
 
         $loader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.yaml');

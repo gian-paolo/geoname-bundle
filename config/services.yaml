@@ -27,6 +27,7 @@ services:
             $em: '@doctrine.orm.entity_manager'
             $httpClient: '@http_client'
             $tmpDir: '%pallari_geoname.temp_dir%'
+            $debug: '%pallari_geoname.debug%'
         calls:
             - [setEntityClasses, ['%pallari_geoname.entities.geoname%', '%pallari_geoname.entities.import%', '%pallari_geoname.entities.alternate_name%']]
             - [setTableNames, ['%pallari_geoname.tables.geoname%', '%pallari_geoname.tables.import%', '%pallari_geoname.tables.hierarchy%', '%pallari_geoname.tables.alternate_name%']]
