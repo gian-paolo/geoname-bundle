@@ -64,28 +64,32 @@ class GeonameImporter
                 $filePath = $this->unzip($filePath);
             }
 
-            $totalProcessed = 0;
+            $totalRead = 0;
+            $totalSaved = 0;
             $startTime = microtime(true);
             
             foreach ($this->parser->getBatches($filePath, 250) as $batch) {
                 $batchStart = microtime(true);
-                $count = $this->processHybridBatch($batch, $allowedCountries);
-                $totalProcessed += $count;
-                $this->updateImportLog($importLog, $totalProcessed);
+                $totalRead += count($batch);
                 
-                if ($this->io && $totalProcessed % 1000 === 0) {
+                $count = $this->processHybridBatch($batch, $allowedCountries);
+                $totalSaved += $count;
+                $this->updateImportLog($importLog, $totalSaved);
+                
+                if ($this->io) {
                     $elapsed = microtime(true) - $startTime;
                     $batchTime = microtime(true) - $batchStart;
                     $memory = memory_get_usage(true) / 1024 / 1024;
-                    $this->io->text(sprintf(
-                        "🚀 [%.2fs] Processed: %d | Last batch: %.3fs | RAM: %.1fMB",
-                        $elapsed, $totalProcessed, $batchTime, $memory
+                    $this->io->write(sprintf(
+                        "\r🚀 [%.2fs] Read: %d | Saved: %d | Batch: %.3fs | RAM: %.1fMB",
+                        $elapsed, $totalRead, $totalSaved, $batchTime, $memory
                     ));
                 }
 
-                // Clear memory and trigger garbage collection
+                // Force memory cleanup even if nothing was saved
+                unset($batch);
                 $this->em->clear();
-                if ($totalProcessed % 2500 === 0) {
+                if ($totalRead % 1000 === 0) {
                     gc_collect_cycles();
                 }
             }
