@@ -58,13 +58,13 @@ class GeonameImporter
             }
 
             $totalProcessed = 0;
-            foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
+            foreach ($this->parser->getBatches($filePath, 250) as $batch) {
                 $totalProcessed += $this->processHybridBatch($batch, $allowedCountries);
                 $this->updateImportLog($importLog, $totalProcessed);
                 
                 // Clear memory and trigger garbage collection
                 $this->em->clear();
-                if ($totalProcessed % 5000 === 0) {
+                if ($totalProcessed % 2500 === 0) {
                     gc_collect_cycles();
                 }
             }
@@ -507,10 +507,19 @@ class GeonameImporter
         }
 
         $count = 0;
-        if (!empty($toInsert)) $count += $this->bulkInsert($this->geonameEntityClass, $toInsert);
-        if (!empty($toUpdate)) $count += $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
+        if (!empty($toInsert)) {
+            $count += $this->bulkInsert($this->geonameEntityClass, $toInsert);
+            unset($toInsert);
+        }
+        if (!empty($toUpdate)) {
+            $count += $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
+            unset($toUpdate);
+        }
 
         $this->syncAdminTablesFromBatch($toProcess);
+        unset($toProcess);
+        unset($ids);
+        unset($existingIds);
 
         return $count;
     }
