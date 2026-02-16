@@ -1041,13 +1041,12 @@ class GeonameImporter
 
         $totalUpdated = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
-            // Identify which columns are actually present in this chunk to avoid setting others to NULL
+            // 1. Strict Key Consistency Check
+            $firstRowKeys = array_keys(reset($chunk));
             $presentProps = [];
-            foreach ($chunk as $row) {
-                foreach (array_keys($row) as $prop) {
-                    if ($prop !== $pkField && isset($columnMap[$prop])) {
-                        $presentProps[$prop] = $columnMap[$prop];
-                    }
+            foreach ($firstRowKeys as $prop) {
+                if ($prop !== $pkField && isset($columnMap[$prop])) {
+                    $presentProps[$prop] = $columnMap[$prop];
                 }
             }
 
@@ -1059,10 +1058,16 @@ class GeonameImporter
 
             foreach ($presentProps as $prop => $col) {
                 $colQuoted = $platform->quoteIdentifier($col);
+                // We add "ELSE colQuoted" to protect existing data if a match is missed
                 $setClauses[$col] = "$colQuoted = CASE $pkColumnQuoted ";
             }
 
             foreach ($chunk as $row) {
+                // Verify this row matches the structure of the first row
+                if (array_keys($row) !== $firstRowKeys) {
+                    throw new \InvalidArgumentException("Inconsistent data structure in bulkUpdate batch. All rows must have the same keys.");
+                }
+
                 $pkVal = $row[$pkField] ?? null;
                 if ($pkVal === null) continue;
                 $pkValues[] = $pkVal;
@@ -1085,7 +1090,8 @@ class GeonameImporter
 
             $sqlSet = [];
             foreach ($setClauses as $col => $clause) {
-                $sqlSet[] = $clause . " END";
+                $colQuoted = $platform->quoteIdentifier($col);
+                $sqlSet[] = $clause . " ELSE $colQuoted END";
             }
 
             $sql = sprintf(
