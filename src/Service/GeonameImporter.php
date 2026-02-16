@@ -1039,16 +1039,25 @@ class GeonameImporter
         $platform = $conn->getDatabasePlatform();
         $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
 
-        $updateCols = $columnMap;
-        unset($updateCols[$pkField]);
-
         $totalUpdated = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
+            // Identify which columns are actually present in this chunk to avoid setting others to NULL
+            $presentProps = [];
+            foreach ($chunk as $row) {
+                foreach (array_keys($row) as $prop) {
+                    if ($prop !== $pkField && isset($columnMap[$prop])) {
+                        $presentProps[$prop] = $columnMap[$prop];
+                    }
+                }
+            }
+
+            if (empty($presentProps)) continue;
+
             $params = [];
             $setClauses = [];
             $pkValues = [];
 
-            foreach ($updateCols as $prop => $col) {
+            foreach ($presentProps as $prop => $col) {
                 $colQuoted = $platform->quoteIdentifier($col);
                 $setClauses[$col] = "$colQuoted = CASE $pkColumnQuoted ";
             }
@@ -1058,7 +1067,7 @@ class GeonameImporter
                 if ($pkVal === null) continue;
                 $pkValues[] = $pkVal;
 
-                foreach ($updateCols as $prop => $col) {
+                foreach ($presentProps as $prop => $col) {
                     $val = $row[$prop] ?? null;
                     if ($val instanceof \DateTimeInterface) {
                         $val = $val->format('Y-m-d H:i:s');
