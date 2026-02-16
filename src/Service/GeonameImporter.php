@@ -72,6 +72,7 @@ class GeonameImporter
                     $samples = $conn->fetchFirstColumn(sprintf("SELECT geonameid FROM %s LIMIT 5", $platform->quoteIdentifier($this->geonameTableName)));
                     $this->io->note(sprintf('Sample IDs in DB: %s', implode(', ', $samples)));
                 }
+                $this->takeMemorySnapshot('START', get_defined_vars());
             }
 
             $filePath = $this->downloadFile($url);
@@ -111,6 +112,8 @@ class GeonameImporter
                     ));
 
                     if ($iteration % 100 === 0) {
+                        $this->takeMemorySnapshot("BATCH_$iteration", get_defined_vars());
+                        $this->compareMemorySnapshots('START', "BATCH_$iteration");
                         $this->em->clear();
                         gc_collect_cycles();
                     }
@@ -126,82 +129,6 @@ class GeonameImporter
             $this->failImportLog($importLog, $e->getMessage());
             throw $e;
         }
-    }
-
-    private function takeMemorySnapshot(string $label): void
-    {
-        $snapshot = [
-            'total' => memory_get_usage(true),
-            'properties' => []
-        ];
-
-        foreach (get_object_vars($this) as $name => $value) {
-            if ($name === 'memorySnapshots') continue;
-            $snapshot['properties'][$name] = $this->estimateSize($value);
-        }
-
-        $this->memorySnapshots[$label] = $snapshot;
-    }
-
-    private function compareMemorySnapshots(string $label1, string $label2): void
-    {
-        if (!isset($this->memorySnapshots[$label1], $this->memorySnapshots[$label2])) return;
-
-        $s1 = $this->memorySnapshots[$label1];
-        $s2 = $this->memorySnapshots[$label2];
-
-        $this->io->newLine();
-        $this->io->writeln(sprintf("<comment>Memory Comparison [%s vs %s]</comment>", $label1, $label2));
-        $diffTotal = ($s2['total'] - $s1['total']) / 1024 / 1024;
-        $this->io->writeln(sprintf("├─ Total RAM Change: <info>%+.2f MB</info>", $diffTotal));
-
-        foreach ($s2['properties'] as $name => $size2) {
-            $size1 = $s1['properties'][$name] ?? 0;
-            if ($size2 > $size1) {
-                $diff = ($size2 - $size1) / 1024;
-                $this->io->writeln(sprintf("├─ Property <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
-            }
-        }
-        $this->io->newLine();
-    }
-
-    private function estimateSize($var): int
-    {
-        try {
-            if (is_resource($var)) return 0;
-            // Use serialization to estimate memory footprint
-            return strlen(@serialize($var));
-        } catch (\Throwable $e) {
-            return 0;
-        }
-    }
-
-    private function reportDeepMemory(int $iteration): void
-    {
-        if (!$this->io) return;
-
-        $uow = $this->em->getUnitOfWork();
-        $identityMapCount = 0;
-        foreach ($uow->getIdentityMap() as $entities) {
-            $identityMapCount += count($entities);
-        }
-
-        $this->io->newLine();
-        $this->io->writeln(sprintf("  <comment>[DEBUG Batch %d]</comment>", $iteration));
-        $this->io->writeln(sprintf("  <info>├─ UnitOfWork IdentityMap:</info> %d entities", $identityMapCount));
-        
-        if ($this->cachedLogger && property_exists($this->cachedLogger, 'queries')) {
-            $this->io->writeln(sprintf("  <info>├─ Cached Logger Queries:</info> %d", count($this->cachedLogger->queries)));
-        }
-
-        // Tentativo di misurare la dimensione di $this
-        try {
-            $size = strlen(serialize($this)) / 1024;
-            $this->io->writeln(sprintf("  <info>└─ Importer Object Size:</info> %.2f KB", $size));
-        } catch (\Throwable $e) {
-            $this->io->writeln("  <info>└─ Importer Object Size:</info> (unserializable)");
-        }
-        $this->io->newLine();
     }
 
     public function importHierarchy(string $url): int
@@ -1219,12 +1146,12 @@ class GeonameImporter
         return $conn->executeQuery($sql, $params)->fetchFirstColumn();
     }
 
-    private function takeMemorySnapshot(string $label): void
+    private function takeMemorySnapshot(string $label, array $localVars = []): void
     {
         $snapshot = [
             'total' => memory_get_usage(true),
             'properties' => [],
-            'globals' => []
+            'locals' => []
         ];
 
         foreach (get_object_vars($this) as $name => $value) {
@@ -1232,8 +1159,9 @@ class GeonameImporter
             $snapshot['properties'][$name] = $this->estimateSize($value);
         }
 
-        // Measure some key globals or defined vars if possible
-        // Note: we can't easily get local vars of the caller here without passing them
+        foreach ($localVars as $name => $value) {
+            $snapshot['locals'][$name] = $this->estimateSize($value);
+        }
         
         $this->memorySnapshots[$label] = $snapshot;
     }
@@ -1250,6 +1178,7 @@ class GeonameImporter
         $diffTotal = ($s2['total'] - $s1['total']) / 1024 / 1024;
         $this->io->writeln(sprintf("├─ Total RAM Change: <info>%+.2f MB</info>", $diffTotal));
 
+        // Properties comparison
         foreach ($s2['properties'] as $name => $size2) {
             $size1 = $s1['properties'][$name] ?? 0;
             if ($size2 > $size1) {
@@ -1257,12 +1186,32 @@ class GeonameImporter
                 $this->io->writeln(sprintf("├─ Property <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
             }
         }
+
+        // Locals comparison
+        foreach ($s2['locals'] as $name => $size2) {
+            $size1 = $s1['locals'][$name] ?? 0;
+            if ($size2 > $size1) {
+                $diff = ($size2 - $size1) / 1024;
+                $this->io->writeln(sprintf("├─ Local Var <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
+            }
+        }
         
-        // Final check on global growth if RAM change is significant but properties aren't
+        // Final check on global growth
         if (abs($diffTotal) > 1 && empty(array_filter($s2['properties'], fn($v, $k) => ($v - ($s1['properties'][$k] ?? 0)) > 10240, ARRAY_FILTER_USE_BOTH))) {
             $this->io->writeln("├─ <error>WARNING:</error> RAM grew significantly but no internal property growth detected.");
             $this->io->writeln("│  This suggests the leak is in external services (Doctrine Logger, Profiler, etc.)");
         }
         $this->io->newLine();
+    }
+
+    private function estimateSize($var): int
+    {
+        try {
+            if (is_resource($var)) return 0;
+            // Use serialization to estimate memory footprint
+            return strlen(@serialize($var));
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 }
