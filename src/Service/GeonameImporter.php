@@ -744,13 +744,20 @@ class GeonameImporter
 
     private function disableLogging(): void
     {
-        $config = $this->em->getConnection()->getConfiguration();
+        $conn = $this->em->getConnection();
+        $config = $conn->getConfiguration();
+        
         if (method_exists($config, 'setSQLLogger')) {
             $config->setSQLLogger(null);
         }
+        
+        // Disable modern middlewares (Symfony Debug, etc)
         if (method_exists($config, 'setMiddlewares')) {
             $config->setMiddlewares([]);
         }
+
+        // Also clear the entity manager to free memory
+        $this->em->clear();
     }
 
     private function downloadFile(string $url): string
