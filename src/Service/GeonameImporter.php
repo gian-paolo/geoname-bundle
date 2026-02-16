@@ -72,7 +72,9 @@ class GeonameImporter
             $totalSkipped = 0;
             $startTime = microtime(true);
             
+            $iteration = 0;
             foreach ($this->parser->getBatches($filePath, 250) as $batch) {
+                $iteration++;
                 $batchStart = microtime(true);
                 $totalRead += count($batch);
                 
@@ -93,6 +95,11 @@ class GeonameImporter
                         "\r🚀 [%.2fs] Read: %d | Ins: %d | Upd: %d (%d mod) | Skip: %d | Batch: %.3fs | RAM: %.1fMB",
                         $elapsed, $totalRead, $totalInserted, $totalUpdated, $totalModified, $totalSkipped, $batchTime, $memory
                     ));
+
+                    // Ogni 20 batch, facciamo un report profondo della memoria
+                    if ($iteration % 20 === 0) {
+                        $this->reportDeepMemory($iteration);
+                    }
                 }
 
                 // Aggressive memory cleanup
@@ -109,6 +116,34 @@ class GeonameImporter
             $this->failImportLog($importLog, $e->getMessage());
             throw $e;
         }
+    }
+
+    private function reportDeepMemory(int $iteration): void
+    {
+        if (!$this->io) return;
+
+        $uow = $this->em->getUnitOfWork();
+        $identityMapCount = 0;
+        foreach ($uow->getIdentityMap() as $entities) {
+            $identityMapCount += count($entities);
+        }
+
+        $this->io->newLine();
+        $this->io->writeln(sprintf("  <comment>[DEBUG Batch %d]</comment>", $iteration));
+        $this->io->writeln(sprintf("  <info>├─ UnitOfWork IdentityMap:</info> %d entities", $identityMapCount));
+        
+        if ($this->cachedLogger && property_exists($this->cachedLogger, 'queries')) {
+            $this->io->writeln(sprintf("  <info>├─ Cached Logger Queries:</info> %d", count($this->cachedLogger->queries)));
+        }
+
+        // Tentativo di misurare la dimensione di $this
+        try {
+            $size = strlen(serialize($this)) / 1024;
+            $this->io->writeln(sprintf("  <info>└─ Importer Object Size:</info> %.2f KB", $size));
+        } catch (\Throwable $e) {
+            $this->io->writeln("  <info>└─ Importer Object Size:</info> (unserializable)");
+        }
+        $this->io->newLine();
     }
 
     public function importHierarchy(string $url): int
@@ -1081,6 +1116,13 @@ class GeonameImporter
             $platform->quoteIdentifier($tableName), 
             $platform->quoteIdentifier($pkColumn)
         );
+
+        // Debug SQL once
+        static $sqlLogged = false;
+        if (!$sqlLogged && $this->io) {
+            $this->io->note("SQL Search Query: " . $sql . " (Table: " . $tableName . ")");
+            $sqlLogged = true;
+        }
         
         $found = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER])->fetchFirstColumn();
         $found = array_map('intval', $found);
