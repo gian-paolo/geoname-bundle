@@ -956,7 +956,7 @@ class GeonameImporter
 
         $conn = $this->em->getConnection();
         $metadata = $this->em->getClassMetadata($entityClass);
-        $tableName = $this->geonameTableName; // Use consistent table name
+        $tableName = $this->geonameTableName;
         
         $columnMap = $this->getColumnMap($metadata);
         $columns = array_values($columnMap);
@@ -964,9 +964,6 @@ class GeonameImporter
         $platform = $conn->getDatabasePlatform();
         $quotedColumns = array_map(fn($c) => $platform->quoteIdentifier($c), $columns);
         $columnsSql = implode(', ', $quotedColumns);
-
-        // Get direct PDO connection
-        $pdo = $conn->getNativeConnection();
         $isMysql = str_contains(strtolower(get_class($platform)), 'mysql') || str_contains(strtolower(get_class($platform)), 'mariadb');
 
         $totalInserted = 0;
@@ -1001,13 +998,10 @@ class GeonameImporter
                 $sql .= ' ON CONFLICT DO NOTHING';
             }
 
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $totalInserted += $stmt->rowCount();
+            $totalInserted += $conn->executeStatement($sql, $params);
 
             unset($params);
             unset($placeholders);
-            unset($stmt);
         }
 
         return $totalInserted;
@@ -1029,7 +1023,6 @@ class GeonameImporter
 
         $platform = $conn->getDatabasePlatform();
         $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
-        $pdo = $conn->getNativeConnection();
 
         $updateCols = $columnMap;
         unset($updateCols[$pkField]);
@@ -1080,16 +1073,14 @@ class GeonameImporter
             );
 
             $allParams = array_merge($params, $pkValues);
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($allParams);
-            $totalUpdated += $stmt->rowCount();
+            $totalUpdated += $conn->executeStatement($sql, $allParams);
 
             unset($params);
             unset($pkValues);
             unset($allParams);
             unset($setClauses);
             unset($sqlSet);
-            unset($stmt);
+            gc_collect_cycles();
         }
 
         return $totalUpdated;
@@ -1108,7 +1099,6 @@ class GeonameImporter
     {
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
-        $pdo = $conn->getNativeConnection();
         
         $tableName = $this->geonameTableName;
         if (str_contains($entityClass, 'AlternateName')) {
@@ -1118,17 +1108,13 @@ class GeonameImporter
         $metadata = $this->em->getClassMetadata($entityClass);
         $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
 
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (%s)", 
+        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (?)", 
             $platform->quoteIdentifier($pkColumn), 
             $platform->quoteIdentifier($tableName), 
-            $platform->quoteIdentifier($pkColumn),
-            $placeholders
+            $platform->quoteIdentifier($pkColumn)
         );
         
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($ids);
-        $found = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $found = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER])->fetchFirstColumn();
 
         return array_map('intval', $found);
     }
