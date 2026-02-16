@@ -1293,7 +1293,7 @@ class GeonameImporter
         }
         
         // Final check on global growth
-        if (abs($diffTotal) > 1 && empty($snapshot['globals'] ?? []) && empty($snapshot['properties'] ?? [])) {
+        if (abs($diffTotal) > 1 && empty($s2['globals'] ?? []) && empty($s2['properties'] ?? [])) {
             $this->io->writeln("├─ <error>WARNING:</error> RAM grew significantly but no variable growth detected.");
             $this->io->writeln("│  This indicates hidden internal PHP buffers or native extension leaks.");
         }
