@@ -358,10 +358,6 @@ class GeonameImporter
                 continue;
             }
             
-            } else {
-                continue;
-            }
-            
             $this->executeInternal($sql, $values);
         }
         
@@ -1243,6 +1239,18 @@ class GeonameImporter
         }
         
         $this->memorySnapshots[$label] = $snapshot;
+
+        // Keep only last few snapshots to avoid memory growth from the snapshots themselves
+        if (count($this->memorySnapshots) > 3) {
+            $keys = array_keys($this->memorySnapshots);
+            // Keep 'START' and the last two
+            foreach ($keys as $key) {
+                if ($key !== 'START' && $key !== $label && $key !== end($keys)) {
+                    unset($this->memorySnapshots[$key]);
+                    if (count($this->memorySnapshots) <= 3) break;
+                }
+            }
+        }
     }
 
     private function compareMemorySnapshots(string $label1, string $label2): void
