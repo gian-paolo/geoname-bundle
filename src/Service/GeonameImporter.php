@@ -60,6 +60,12 @@ class GeonameImporter
         $importLog = $this->createImportLog('full_import', $url);
         
         try {
+            $conn = $this->em->getConnection();
+            if ($this->io) {
+                $count = $conn->fetchOne(sprintf("SELECT COUNT(*) FROM %s", $conn->getDatabasePlatform()->quoteIdentifier($this->geonameTableName)));
+                $this->io->note(sprintf('Table %s contains %d records before starting.', $this->geonameTableName, $count));
+            }
+
             $filePath = $this->downloadFile($url);
             if (str_ends_with($url, '.zip')) {
                 $filePath = $this->unzip($filePath);
@@ -96,18 +102,14 @@ class GeonameImporter
                         $elapsed, $totalRead, $totalInserted, $totalUpdated, $totalModified, $totalSkipped, $batchTime, $memory
                     ));
 
-                    // Ogni 20 batch, facciamo un report profondo della memoria
-                    if ($iteration % 20 === 0) {
-                        $this->reportDeepMemory($iteration);
+                    if ($iteration % 50 === 0) {
+                        $this->em->clear();
+                        gc_collect_cycles();
                     }
                 }
 
-                // Aggressive memory cleanup
-                $this->em->clear();
-                $this->purgeLogger();
                 $batch = null;
                 $results = null;
-                gc_collect_cycles();
             }
 
             $this->completeImportLog($importLog, $totalInserted + $totalUpdated);
@@ -954,7 +956,7 @@ class GeonameImporter
 
         $conn = $this->em->getConnection();
         $metadata = $this->em->getClassMetadata($entityClass);
-        $tableName = $metadata->getTableName();
+        $tableName = $this->geonameTableName; // Use consistent table name
         
         $columnMap = $this->getColumnMap($metadata);
         $columns = array_values($columnMap);
@@ -962,6 +964,10 @@ class GeonameImporter
         $platform = $conn->getDatabasePlatform();
         $quotedColumns = array_map(fn($c) => $platform->quoteIdentifier($c), $columns);
         $columnsSql = implode(', ', $quotedColumns);
+
+        // Get direct PDO connection
+        $pdo = $conn->getNativeConnection();
+        $isMysql = str_contains(strtolower(get_class($platform)), 'mysql') || str_contains(strtolower(get_class($platform)), 'mariadb');
 
         $totalInserted = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
@@ -985,20 +991,23 @@ class GeonameImporter
 
             $sql = sprintf(
                 'INSERT %s INTO %s (%s) VALUES %s',
-                (str_contains(strtolower(get_class($platform)), 'mysql') || str_contains(strtolower(get_class($platform)), 'mariadb')) ? 'IGNORE' : '',
+                $isMysql ? 'IGNORE' : '',
                 $platform->quoteIdentifier($tableName),
                 $columnsSql,
                 implode(', ', $placeholders)
             );
 
-            // For PostgreSQL/SQLite we use ON CONFLICT DO NOTHING
-            if (str_contains(strtolower(get_class($platform)), 'postgresql') || str_contains(strtolower(get_class($platform)), 'sqlite')) {
+            if (!$isMysql && (str_contains(strtolower(get_class($platform)), 'postgresql') || str_contains(strtolower(get_class($platform)), 'sqlite'))) {
                 $sql .= ' ON CONFLICT DO NOTHING';
             }
 
-            $totalInserted += $conn->executeStatement($sql, $params);
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $totalInserted += $stmt->rowCount();
+
             unset($params);
             unset($placeholders);
+            unset($stmt);
         }
 
         return $totalInserted;
@@ -1010,16 +1019,17 @@ class GeonameImporter
 
         $conn = $this->em->getConnection();
         $metadata = $this->em->getClassMetadata($entityClass);
-        $tableName = $metadata->getTableName();
-        $columnMap = $this->getColumnMap($metadata);
-        
-        if (!isset($columnMap[$pkField])) {
-            throw new \InvalidArgumentException("Primary key field '$pkField' not found.");
+        $tableName = $this->geonameTableName;
+        if (str_contains($entityClass, 'AlternateName')) {
+            $tableName = $this->alternateNameTableName;
         }
+
+        $columnMap = $this->getColumnMap($metadata);
         $pkColumn = $columnMap[$pkField];
 
         $platform = $conn->getDatabasePlatform();
         $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
+        $pdo = $conn->getNativeConnection();
 
         $updateCols = $columnMap;
         unset($updateCols[$pkField]);
@@ -1038,7 +1048,6 @@ class GeonameImporter
             foreach ($chunk as $row) {
                 $pkVal = $row[$pkField] ?? null;
                 if ($pkVal === null) continue;
-
                 $pkValues[] = $pkVal;
 
                 foreach ($updateCols as $prop => $col) {
@@ -1070,17 +1079,17 @@ class GeonameImporter
                 implode(', ', array_fill(0, count($pkValues), '?'))
             );
 
-            // Combine all parameters: those for CASE statements and those for the IN clause
             $allParams = array_merge($params, $pkValues);
-            $totalUpdated += $conn->executeStatement($sql, $allParams);
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($allParams);
+            $totalUpdated += $stmt->rowCount();
 
-            // Explicit cleanup for GC
             unset($params);
             unset($pkValues);
             unset($allParams);
             unset($setClauses);
             unset($sqlSet);
-            gc_collect_cycles();
+            unset($stmt);
         }
 
         return $totalUpdated;
@@ -1099,11 +1108,9 @@ class GeonameImporter
     {
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
+        $pdo = $conn->getNativeConnection();
         
-        // Use the explicitly set table name which includes prefixes
         $tableName = $this->geonameTableName;
-        
-        // If we are searching for alternate names, use that table
         if (str_contains($entityClass, 'AlternateName')) {
             $tableName = $this->alternateNameTableName;
         }
@@ -1111,33 +1118,18 @@ class GeonameImporter
         $metadata = $this->em->getClassMetadata($entityClass);
         $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
 
-        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (?)", 
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (%s)", 
             $platform->quoteIdentifier($pkColumn), 
             $platform->quoteIdentifier($tableName), 
-            $platform->quoteIdentifier($pkColumn)
+            $platform->quoteIdentifier($pkColumn),
+            $placeholders
         );
-
-        // Debug SQL once
-        static $sqlLogged = false;
-        if (!$sqlLogged && $this->io) {
-            $this->io->note("SQL Search Query: " . $sql . " (Table: " . $tableName . ")");
-            $sqlLogged = true;
-        }
         
-        $found = $conn->executeQuery($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER])->fetchFirstColumn();
-        $found = array_map('intval', $found);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($ids);
+        $found = $stmt->fetchAll(\PDO::FETCH_COLUMN);
 
-        // Debug: if we are searching but nothing is found, check if table is actually empty
-        if (empty($found) && !empty($ids) && $this->io) {
-            $checkSql = sprintf("SELECT COUNT(*) FROM %s LIMIT 1", $platform->quoteIdentifier($tableName));
-            $count = (int)$conn->fetchOne($checkSql);
-            if ($count > 0) {
-                 // The table is NOT empty, but we found nothing. This is a match problem.
-                 // Let's log it only once per batch to avoid noise.
-                 // $this->io->note(sprintf('Match issue: %d IDs searched in %s (non-empty), 0 found. First ID searched: %s', count($ids), $tableName, $ids[0]));
-            }
-        }
-        
-        return $found;
+        return array_map('intval', $found);
     }
 }
