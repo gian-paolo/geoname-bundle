@@ -1086,6 +1086,9 @@ class GeonameImporter
         return $totalUpdated;
     }
 
+    /**
+     * Maps entity field names to database column names using ClassMetadata.
+     */
     private function getColumnMap(ClassMetadata $metadata): array
     {
         $map = [];
