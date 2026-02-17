@@ -79,8 +79,8 @@ class InstallCommand extends Command
         }
 
         // 5. Advanced Search Optimization (Full-Text)
-        // If they already said yes in Step 1, we use that as default
-        if ($io->confirm('Step 5: Optimize database for advanced search? (Full-Text indexes)', $this->fulltextRequested)) {
+        // No question here: we follow the choice made in Step 1
+        if ($this->fulltextRequested) {
             $this->optimizeDatabase($io);
         }
 
@@ -110,11 +110,13 @@ class InstallCommand extends Command
 
         if ($fs->exists($configFile)) {
             if (!$io->confirm('Configuration file already exists. Overwrite?', false)) {
+                // We still need to know if fulltext is enabled in existing config for Step 5
+                // but for simplicity in the installer, we assume if they don't overwrite, they manage it manually.
                 return;
             }
         }
 
-        $this->fulltextRequested = $io->confirm('Enable Full-Text search features in configuration?', true);
+        $this->fulltextRequested = $io->confirm('Enable Full-Text search? (Adds indexes to DB and enables advanced search features)', true);
         $fulltextString = $this->fulltextRequested ? 'true' : 'false';
 
         $enableAdmin5 = $io->confirm('Enable Admin5 support?', false);
@@ -207,7 +209,7 @@ PHP;
         $continentMap = [
             'EU' => 'AD,AL,AT,AX,BA,BE,BG,BY,CH,CY,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SJ,SK,SM,UA,VA',
             'NA' => 'CA,US,MX,BS,CU,DO,HT,JM,PA,CR,NI,HN,SV,GT,BZ',
-            'SA' => 'AR,BO,BR,CL,CO,EC,FK,GY,PY,PE,SR,UY,VE',
+            'SA' => 'AR,BO,BR,CL,CO,EC,FK,GY,PY,PE,Suriname,UY,VE',
             'AS' => 'AF,AM,AZ,BD,BH,BN,BT,CN,GE,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE',
             'AF' => 'AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RW,SC,SD,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,ZA,ZM,ZW',
             'OC' => 'AU,FJ,KI,MH,FM,NR,NZ,PW,PG,WS,SB,TO,TV,VU',
@@ -277,6 +279,8 @@ PHP;
         $geonameMetadata = $this->em->getClassMetadata($this->geonameEntityClass);
         $tableName = $geonameMetadata->getTableName();
         $tableNameQuoted = $platform->quoteIdentifier($tableName);
+
+        $io->section('Advanced Search Optimization');
 
         try {
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
