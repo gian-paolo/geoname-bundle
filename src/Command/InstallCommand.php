@@ -68,22 +68,22 @@ class InstallCommand extends Command
         $entityDir = $io->ask('Entity directory?', $defaultEntityDir);
 
         // 1. Generate Config YAML
-        if ($io->confirm('Step 1: Generate configuration file?', true)) {
+        if ($this->confirm($io, 'Step 1: Generate configuration file?', true)) {
             $this->generateConfig($io, $namespace);
         }
 
         // 2. Generate Entities
-        if ($io->confirm('Step 2: Generate entity files?', true)) {
+        if ($this->confirm($io, 'Step 2: Generate entity files?', true)) {
             $this->generateEntities($io, $namespace, $entityDir);
         }
 
         // 3. Update Schema
-        if ($io->confirm('Step 3: Create/Update database schema?', true)) {
+        if ($this->confirm($io, 'Step 3: Create/Update database schema?', true)) {
             $this->updateSchema($io);
         }
 
         // 4. Initial Data
-        if ($io->confirm('Step 4: Enable initial countries and languages?', true)) {
+        if ($this->confirm($io, 'Step 4: Enable initial countries and languages?', true)) {
             $this->setupInitialData($io);
         }
 
@@ -93,7 +93,7 @@ class InstallCommand extends Command
         }
 
         // 6. Run First Sync
-        if ($io->confirm('Step 6: Run initial synchronization now? (This may take a while)', false)) {
+        if ($this->confirm($io, 'Step 6: Run initial synchronization now? (This may take a while)', false)) {
             try {
                 $this->runCommand('pallari:geoname:import-admin-codes', [], $output);
                 $this->runCommand('pallari:geoname:sync', [], $output);
@@ -104,6 +104,18 @@ class InstallCommand extends Command
 
         $io->success('Installation completed successfully!');
         return Command::SUCCESS;
+    }
+
+    private function confirm(SymfonyStyle $io, string $question, bool $default): bool
+    {
+        $answer = $io->ask($question . ($default ? ' (Y/n)' : ' (y/N)'), $default ? 'y' : 'n');
+        $answer = strtolower(trim((string)$answer));
+        
+        if (empty($answer)) {
+            return $default;
+        }
+
+        return in_array($answer, ['y', 'yes', 'si', 's', '1', 'true']);
     }
 
     private function generateConfig(SymfonyStyle $io, string $namespace): void
@@ -117,15 +129,15 @@ class InstallCommand extends Command
         $configFile = $configDir . '/pallari_geoname.yaml';
 
         if ($fs->exists($configFile)) {
-            if (!$io->confirm('Configuration file already exists. Overwrite?', false)) {
+            if (!$this->confirm($io, 'Configuration file already exists. Overwrite?', false)) {
                 return;
             }
         }
 
-        $this->fulltextRequested = $io->confirm('Enable Full-Text search? (Adds indexes to DB and enables advanced search features)', true);
+        $this->fulltextRequested = $this->confirm($io, 'Enable Full-Text search? (Adds indexes to DB and enables advanced search features)', true);
         $fulltextString = $this->fulltextRequested ? 'true' : 'false';
 
-        $enableAdmin5 = $io->confirm('Enable Admin5 support?', false);
+        $enableAdmin5 = $this->confirm($io, 'Enable Admin5 support?', false);
         $admin5String = $enableAdmin5 ? 'true' : 'false';
 
         $namespace = rtrim($namespace, '\\');
