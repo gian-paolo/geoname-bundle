@@ -108,7 +108,8 @@ class InstallCommand extends Command
 
     private function confirm(SymfonyStyle $io, string $question, bool $default): bool
     {
-        $answer = $io->ask($question . ($default ? ' (Y/n)' : ' (y/N)'), $default ? 'y' : 'n');
+        $label = $default ? ' (Y/n)' : ' (y/N)';
+        $answer = $io->ask($question . $label, $default ? 'y' : 'n');
         $answer = strtolower(trim((string)$answer));
         
         if (empty($answer)) {
