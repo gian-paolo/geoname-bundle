@@ -571,7 +571,7 @@ class GeonameImporter
             'id' => (int)$row[0],
             'name' => $name,
             'asciiName' => mb_substr($asciiName, 0, 200),
-            'alternatenames' => mb_substr((string)($row[3] ?? ''), 0, 10000),
+            'alternatenames' => mb_substr((string)($row[3] ?? ''), 0, 20000),
             'latitude' => (float)($row[4] ?? 0),
             'longitude' => (float)($row[5] ?? 0),
             'featureClass' => ($row[6] ?? '') !== '' ? mb_substr((string)$row[6], 0, 1) : null,

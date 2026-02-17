@@ -24,7 +24,7 @@ abstract class AbstractGeoName
     #[ORM\Column(name: 'ascii_name', length: 200, options: ['charset' => 'ascii'])]
     protected ?string $asciiName = null;
 
-    #[ORM\Column(name: 'alternate_names', type: Types::TEXT, length: 10000, nullable: true)]
+    #[ORM\Column(name: 'alternate_names', type: Types::TEXT, length: 20000, nullable: true)]
     protected ?string $alternatenames = null;
 
     #[ORM\Column(type: Types::FLOAT)]
