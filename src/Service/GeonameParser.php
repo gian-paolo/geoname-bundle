@@ -17,13 +17,11 @@ class GeonameParser
 
         try {
             while (($line = fgets($handle)) !== false) {
-                // 1. Quick check for UTF-8 validity
+                // High-performance encoding check
                 if (!mb_check_encoding($line, 'UTF-8')) {
-                    // 2. If invalid, convert from Latin-1 to preserve common European symbols (like 'à')
+                    // If not valid UTF-8, assume it's ISO-8859-1 (Latin-1) and convert to preserve characters like 'à'
                     $line = mb_convert_encoding($line, 'UTF-8', 'ISO-8859-1');
                 }
-
-                // Note: Final byte-level safety is now handled by mb_substr in Importer
                 yield explode("\t", rtrim($line, "\r\n"));
             }
         } finally {
