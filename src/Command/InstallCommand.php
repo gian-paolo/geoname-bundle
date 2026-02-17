@@ -33,6 +33,15 @@ class InstallCommand extends Command
         'GeoHierarchy' => 'AbstractGeoHierarchy',
     ];
 
+    private const CONTINENT_MAP = [
+        'EU' => 'AD,AL,AT,AX,BA,BE,BG,BY,CH,CY,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SJ,SK,SM,UA,VA',
+        'NA' => 'CA,US,MX,BS,CU,DO,HT,JM,PA,CR,NI,HN,SV,GT,BZ',
+        'SA' => 'AR,BO,BR,CL,CO,EC,FK,GY,PY,PE,SR,UY,VE',
+        'AS' => 'AF,AM,AZ,BD,BH,BN,BT,CN,GE,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE',
+        'AF' => 'AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RW,SC,SD,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,ZA,ZM,ZW',
+        'OC' => 'AU,FJ,KI,MH,FM,NR,NZ,PW,PG,WS,SB,TO,TV,VU',
+    ];
+
     private bool $fulltextRequested = false;
 
     public function __construct(
@@ -203,15 +212,6 @@ PHP;
 
     private function setupInitialData(SymfonyStyle $io): void
     {
-        $continentMap = [
-            'EU' => 'AD,AL,AT,AX,BA,BE,BG,BY,CH,CY,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SJ,SK,SM,UA,VA',
-            'NA' => 'CA,US,MX,BS,CU,DO,HT,JM,PA,CR,NI,HN,SV,GT,BZ',
-            'SA' => 'AR,BO,BR,CL,CO,EC,FK,GY,PY,PE,SR,UY,VE',
-            'AS' => 'AF,AM,AZ,BD,BH,BN,BT,CN,GE,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE',
-            'AF' => 'AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RW,SC,SD,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,ZA,ZM,ZW',
-            'OC' => 'AU,FJ,KI,MH,FM,NR,NZ,PW,PG,WS,SB,TO,TV,VU',
-        ];
-
         $choice = $io->choice('How do you want to select countries to enable?', [
             'manual' => 'Manual entry (comma separated codes)',
             'continents' => 'Select by Continents',
@@ -220,13 +220,13 @@ PHP;
 
         $enabledCodes = [];
         if ($choice === 'all') {
-            foreach ($continentMap as $codes) {
+            foreach (self::CONTINENT_MAP as $codes) {
                 $enabledCodes = array_merge($enabledCodes, explode(',', $codes));
             }
         } elseif ($choice === 'manual') {
             $answer = $io->ask('Enter country codes to enable (e.g. IT,US,FR) or "all" to enable everything', 'IT');
             if (strtolower(trim($answer)) === 'all') {
-                foreach ($continentMap as $codes) {
+                foreach (self::CONTINENT_MAP as $codes) {
                     $enabledCodes = array_merge($enabledCodes, explode(',', $codes));
                 }
             } else {
@@ -236,7 +236,7 @@ PHP;
             $continentChoices = ['EU' => 'Europe (EU)', 'NA' => 'North America (NA)', 'SA' => 'South America (SA)', 'AS' => 'Asia (AS)', 'AF' => 'Africa (AF)', 'OC' => 'Oceania (OC)'];
             $selectedContinents = $io->choice('Select continents (comma separated)', $continentChoices, null, true);
             foreach ($selectedContinents as $continentKey) {
-                $enabledCodes = array_merge($enabledCodes, explode(',', $continentMap[$continentKey]));
+                $enabledCodes = array_merge($enabledCodes, explode(',', self::CONTINENT_MAP[$continentKey]));
             }
         }
 
@@ -245,7 +245,15 @@ PHP;
 
         foreach ($enabledCodes as $code) {
             $code = strtoupper(trim($code));
-            if (empty($code) || in_array($code, $existingCountryCodes)) continue;
+            if (empty($code)) continue;
+            
+            if (strlen($code) > 2) {
+                $io->warning(sprintf('Skipping invalid country code: "%s" (must be 2 characters)', $code));
+                continue;
+            }
+
+            if (in_array($code, $existingCountryCodes)) continue;
+            
             $country = new $this->countryEntityClass();
             $country->setCode($code);
             $country->setName($code);
@@ -261,6 +269,12 @@ PHP;
         foreach (explode(',', $languagesInput) as $lang) {
             $lang = strtolower(trim($lang));
             if (empty($lang) || in_array($lang, $existingLangCodes)) continue;
+            
+            if (strlen($lang) > 7) {
+                $io->warning(sprintf('Skipping invalid language code: "%s" (max 7 characters)', $lang));
+                continue;
+            }
+
             $language = new $this->languageEntityClass();
             $language->setCode($lang);
             $language->setName(strtoupper($lang));
