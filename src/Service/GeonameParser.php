@@ -17,6 +17,11 @@ class GeonameParser
 
         try {
             while (($line = fgets($handle)) !== false) {
+                // High-performance encoding check
+                if (!mb_check_encoding($line, 'UTF-8')) {
+                    // If not valid UTF-8, assume it's ISO-8859-1 (Latin-1) and convert to preserve characters like 'à'
+                    $line = mb_convert_encoding($line, 'UTF-8', 'ISO-8859-1');
+                }
                 yield explode("\t", rtrim($line, "\r\n"));
             }
         } finally {
