@@ -74,8 +74,13 @@ class InstallCommand extends Command
             $this->setupInitialData($io);
         }
 
-        // 5. Run First Sync
-        if ($io->confirm('Step 5: Run initial synchronization now? (This may take a while)', false)) {
+        // 5. Advanced Search Optimization (Full-Text)
+        if ($io->confirm('Step 5: Optimize database for advanced search? (Full-Text indexes)', true)) {
+            $this->optimizeDatabase($io);
+        }
+
+        // 6. Run First Sync
+        if ($io->confirm('Step 6: Run initial synchronization now? (This may take a while)', false)) {
             try {
                 $this->runCommand('pallari:geoname:import-admin-codes', [], $output);
                 $this->runCommand('pallari:geoname:sync', [], $output);
@@ -292,6 +297,46 @@ PHP;
 
         $this->em->flush();
         $io->success('Initial settings saved to database.');
+    }
+
+    private function optimizeDatabase(SymfonyStyle $io): void
+    {
+        $conn = $this->em->getConnection();
+        $platform = $conn->getDatabasePlatform();
+        $platformClass = strtolower(get_class($platform));
+        
+        // Get actual table name for GeoName (including possible prefixes)
+        $geonameMetadata = $this->em->getClassMetadata($this->em->getRepository(AbstractGeoName::class)->getClassName());
+        $tableName = $geonameMetadata->getTableName();
+        $tableNameQuoted = $platform->quoteIdentifier($tableName);
+
+        try {
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
+                $io->note('Creating MySQL/MariaDB Full-Text index...');
+                $sql = sprintf(
+                    "ALTER TABLE %s ADD FULLTEXT INDEX idx_geoname_fulltext (name, ascii_name, alternate_names)",
+                    $tableNameQuoted
+                );
+                $conn->executeStatement($sql);
+            } elseif (str_contains($platformClass, 'postgresql')) {
+                $io->note('Creating PostgreSQL GIN index for Full-Text search...');
+                $sql = sprintf(
+                    "CREATE INDEX idx_geoname_fulltext ON %s USING GIN (to_tsvector('simple', name || ' ' || ascii_name || ' ' || COALESCE(alternate_names, '')))",
+                    $tableNameQuoted
+                );
+                $conn->executeStatement($sql);
+            } else {
+                $io->warning('Full-Text index optimization is not available for this database platform. Standard indexes will be used.');
+            }
+            $io->success('Advanced search optimization completed.');
+        } catch (\Exception $e) {
+            // If it already exists, it's fine
+            if (str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name')) {
+                $io->note('Advanced search optimization already exists.');
+            } else {
+                $io->warning('Search optimization failed: ' . $e->getMessage());
+            }
+        }
     }
 
     private function runCommand(string $name, array $params, OutputInterface $output): void
