@@ -26,23 +26,11 @@ class GeonameSearchService
 
     /**
      * Search for toponyms with optional administrative names and coordinates.
-     *
-     * Options:
-     * - select: array of columns or a PRESET_* constant (default: PRESET_FULL)
-     * - countries: array of country codes (e.g. ['IT', 'FR'])
-     * - feature_classes: array of feature classes (e.g. ['P', 'A'])
-     * - feature_codes: array of feature codes (e.g. ['PPL', 'ADM1'])
-     * - limit: max results (default from config)
-     * - with_admin_names: join with admin1/admin2 tables to get names
-     * - min_population: filter by population
-     * - id: filter by geonameid
-     * - order_by: 'population_desc' (default), 'name_asc', 'relevance'
      */
     public function search(string $term, array $options = []): array
     {
         $term = trim($term);
         
-        // Validation: Search term must be at least 3 characters if no other primary filters are present
         $hasPrimaryFilter = isset($options['id']) || !empty($options['countries']) || isset($options['admin1_code']);
         if ($term !== '' && strlen($term) < 3 && !$hasPrimaryFilter) {
             return [];
@@ -51,7 +39,6 @@ class GeonameSearchService
         $qb = $this->connection->createQueryBuilder();
         $platformClass = strtolower(get_class($this->connection->getDatabasePlatform()));
         
-        // 1. Column Selection
         $select = $options['select'] ?? self::PRESET_FULL;
         if (!is_array($select)) {
             $select = self::PRESET_FULL;
@@ -64,17 +51,12 @@ class GeonameSearchService
         $qb->from($this->geonameTable, 'g');
         $qb->where('g.is_deleted = 0');
 
-        // 2. Hybrid Search Strategy
         if ($term !== '') {
-            $orConditions = [
-                'g.name LIKE :prefix',
-                'g.ascii_name LIKE :prefix'
-            ];
+            $orConditions = ['g.name LIKE :prefix', 'g.ascii_name LIKE :prefix'];
             $qb->setParameter('prefix', $term . '%');
 
             if ($this->useFulltext && strlen($term) >= 3) {
                 if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
-                    // Removed ascii_name because it often has a different charset in MySQL
                     $orConditions[] = 'MATCH(g.name, g.alternate_names) AGAINST(:ft_term IN BOOLEAN MODE)';
                     $qb->setParameter('ft_term', $term . '*');
                 } elseif (str_contains($platformClass, 'postgresql')) {
@@ -84,52 +66,40 @@ class GeonameSearchService
             } else {
                 $orConditions[] = 'g.alternate_names LIKE :prefix';
             }
-
             $qb->andWhere($qb->expr()->or(...$orConditions));
         }
 
-        // 3. Optional: Join Admin Names
         if ($options['with_admin_names'] ?? false) {
             $this->applyAdminJoins($qb);
         }
 
-        // 4. Filters
         if (!empty($options['countries'])) {
-            $qb->andWhere('g.country_code IN (:countries)')
-               ->setParameter('countries', $options['countries'], ArrayParameterType::STRING);
+            $qb->andWhere('g.country_code IN (:countries)')->setParameter('countries', $options['countries'], ArrayParameterType::STRING);
         }
 
         if (!empty($options['feature_classes'])) {
-            $qb->andWhere('g.feature_class IN (:fclasses)')
-               ->setParameter('fclasses', $options['feature_classes'], ArrayParameterType::STRING);
+            $qb->andWhere('g.feature_class IN (:fclasses)')->setParameter('fclasses', $options['feature_classes'], ArrayParameterType::STRING);
         }
 
         if (!empty($options['feature_codes'])) {
-            $qb->andWhere('g.feature_code IN (:fcodes)')
-               ->setParameter('fcodes', $options['feature_codes'], ArrayParameterType::STRING);
+            $qb->andWhere('g.feature_code IN (:fcodes)')->setParameter('fcodes', $options['feature_codes'], ArrayParameterType::STRING);
         }
 
         if (isset($options['min_population'])) {
-            $qb->andWhere('g.population >= :minpop')
-               ->setParameter('minpop', $options['min_population']);
+            $qb->andWhere('g.population >= :minpop')->setParameter('minpop', $options['min_population']);
         }
 
         if (isset($options['id'])) {
-            $qb->andWhere('g.geonameid = :id')
-               ->setParameter('id', $options['id']);
+            $qb->andWhere('g.geonameid = :id')->setParameter('id', $options['id']);
         }
 
-        // Parent code filters for hierarchy navigation
         foreach (['admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'] as $adminLevel) {
             if (isset($options[$adminLevel])) {
-                $qb->andWhere("g.$adminLevel = :$adminLevel")
-                   ->setParameter($adminLevel, $options[$adminLevel]);
+                $qb->andWhere("g.$adminLevel = :$adminLevel")->setParameter($adminLevel, $options[$adminLevel]);
             }
         }
 
-        // 5. Sorting
         $orderBy = $options['order_by'] ?? 'population_desc';
-        
         if ($orderBy === 'name_asc') {
             $qb->orderBy('g.name', 'ASC');
         } elseif ($orderBy === 'relevance' && $this->useFulltext && strlen($term) >= 3) {
@@ -140,12 +110,10 @@ class GeonameSearchService
                 $qb->orderBy('g.population', 'DESC');
             }
         } else {
-            // Default: population
             $qb->orderBy('g.population', 'DESC');
             $qb->addOrderBy('g.name', 'ASC');
         }
 
-        // 6. Limits (Clamped between 1 and 1000)
         $limit = $options['limit'] ?? $this->maxResults;
         $limit = max(1, min(1000, (int)$limit));
         $qb->setMaxResults($limit);
@@ -158,14 +126,106 @@ class GeonameSearchService
      */
     public function getById(int $id, bool $withAdminNames = false, array $select = self::PRESET_FULL): ?array
     {
-        $results = $this->search('', [
-            'id' => $id,
-            'with_admin_names' => $withAdminNames,
-            'select' => $select,
-            'limit' => 1
-        ]);
-        
+        $results = $this->search('', ['id' => $id, 'with_admin_names' => $withAdminNames, 'select' => $select, 'limit' => 1]);
         return $results[0] ?? null;
+    }
+
+    /**
+     * Get breadcrumbs (ordered administrative chain) for a given geonameid.
+     * Returns an array of arrays: [['name' => 'Italy', 'id' => ...], ['name' => 'Piedmont', ...]]
+     */
+    public function getBreadcrumbs(int $id): array
+    {
+        $item = $this->getById($id, false, ['geonameid', 'name', 'country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code', 'feature_code']);
+        if (!$item) return [];
+
+        $crumbs = [];
+        $countryCode = $item['country_code'];
+
+        // 1. Resolve Admin Levels using the dedicated fast tables
+        $adminLevels = [
+            ['table' => $this->admin1Table, 'code' => $item['admin1_code'], 'fields' => ['country_code', 'admin1_code']],
+            ['table' => $this->admin2Table, 'code' => $item['admin2_code'], 'fields' => ['country_code', 'admin1_code', 'admin2_code']],
+            ['table' => $this->admin3Table, 'code' => $item['admin3_code'], 'fields' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code']],
+            ['table' => $this->admin4Table, 'code' => $item['admin4_code'], 'fields' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code']],
+            ['table' => $this->admin5Table, 'code' => $item['admin5_code'], 'fields' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code']],
+        ];
+
+        foreach ($adminLevels as $level) {
+            if (empty($level['code']) || $level['code'] === '00') continue;
+
+            $qb = $this->connection->createQueryBuilder();
+            $qb->select('name', 'geonameid')->from($level['table']);
+            foreach ($level['fields'] as $field) {
+                $qb->andWhere("$field = :$field")->setParameter($field, $item[$field]);
+            }
+            
+            $adminData = $qb->executeQuery()->fetchAssociative();
+            if ($adminData) {
+                // If the crumb is the item itself, we stop adding parents
+                if ((int)$adminData['geonameid'] === (int)$item['geonameid']) break;
+                $crumbs[] = $adminData;
+            }
+        }
+
+        // Add the item itself as the last crumb
+        $crumbs[] = ['name' => $item['name'], 'geonameid' => $item['geonameid']];
+
+        return $crumbs;
+    }
+
+    /**
+     * Find nearest toponyms to a given coordinate.
+     */
+    public function findNearest(float $lat, float $lon, array $options = []): array
+    {
+        $qb = $this->connection->createQueryBuilder();
+        $select = $options['select'] ?? self::PRESET_GEO;
+        foreach ($select as $column) { $qb->addSelect('g.' . $column); }
+
+        // Haversine formula for distance in KM
+        $qb->addSelect('(6371 * acos(cos(radians(:lat)) * cos(radians(g.latitude)) * cos(radians(g.longitude) - radians(:lon)) + sin(radians(:lat)) * sin(radians(g.latitude)))) AS distance');
+        $qb->from($this->geonameTable, 'g');
+        $qb->where('g.is_deleted = 0');
+        $qb->setParameter('lat', $lat);
+        $qb->setParameter('lon', $lon);
+
+        if (!empty($options['feature_classes'])) {
+            $qb->andWhere('g.feature_class IN (:fclasses)')->setParameter('fclasses', $options['feature_classes'], ArrayParameterType::STRING);
+        }
+
+        $qb->orderBy('distance', 'ASC');
+        $qb->setMaxResults($options['limit'] ?? 10);
+
+        return $qb->executeQuery()->fetchAllAssociative();
+    }
+
+    /**
+     * Find toponyms within a bounding box.
+     */
+    public function findInBoundingBox(float $north, float $east, float $south, float $west, array $options = []): array
+    {
+        $options['select'] = $options['select'] ?? self::PRESET_GEO;
+        $qb = $this->connection->createQueryBuilder();
+        foreach ($options['select'] as $column) { $qb->addSelect('g.' . $column); }
+        
+        $qb->from($this->geonameTable, 'g')
+           ->where('g.is_deleted = 0')
+           ->andWhere('g.latitude <= :north AND g.latitude >= :south')
+           ->andWhere('g.longitude <= :east AND g.longitude >= :west')
+           ->setParameter('north', $north)
+           ->setParameter('south', $south)
+           ->setParameter('east', $east)
+           ->setParameter('west', $west);
+
+        if (!empty($options['feature_classes'])) {
+            $qb->andWhere('g.feature_class IN (:fclasses)')->setParameter('fclasses', $options['feature_classes'], ArrayParameterType::STRING);
+        }
+
+        $qb->orderBy('g.population', 'DESC');
+        $qb->setMaxResults($options['limit'] ?? 50);
+
+        return $qb->executeQuery()->fetchAllAssociative();
     }
 
     /**
@@ -173,55 +233,32 @@ class GeonameSearchService
      */
     public function getChildren(string $countryCode, array $parentCodes = [], array $options = []): array
     {
-        $searchOptions = array_merge([
-            'countries' => [$countryCode],
-            'order_by' => 'name_asc',
-            'limit' => $this->maxResults
-        ], $options);
-
+        $searchOptions = array_merge(['countries' => [$countryCode], 'order_by' => 'name_asc', 'limit' => $this->maxResults], $options);
         foreach ($parentCodes as $level => $code) {
             if (in_array($level, ['admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'])) {
                 $searchOptions[$level] = $code;
             }
         }
-
         return $this->search('', $searchOptions);
     }
 
     /**
-     * Get all descendants (children, grandchildren, etc.) of a parent toponym.
-     * Automatically resolves administrative codes from the parent ID.
+     * Get all descendants of a parent toponym by resolving its administrative codes.
      */
     public function getDescendantsByParentId(int $parentId, array $options = []): array
     {
-        // 1. Get parent data to identify its administrative location
         $parent = $this->getById($parentId, false, ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'feature_code', 'feature_class']);
-        
-        if (!$parent) {
-            return [];
-        }
+        if (!$parent) return [];
 
-        // 2. Build filter catena based on parent's type
         $parentCodes = [];
         $fCode = $parent['feature_code'] ?? '';
         $fClass = $parent['feature_class'] ?? '';
 
         if ($fClass === 'A') {
-            if ($fCode === 'ADM1') {
-                $parentCodes['admin1_code'] = $parent['admin1_code'];
-            } elseif ($fCode === 'ADM2') {
-                $parentCodes['admin1_code'] = $parent['admin1_code'];
-                $parentCodes['admin2_code'] = $parent['admin2_code'];
-            } elseif ($fCode === 'ADM3') {
-                $parentCodes['admin1_code'] = $parent['admin1_code'];
-                $parentCodes['admin2_code'] = $parent['admin2_code'];
-                $parentCodes['admin3_code'] = $parent['admin3_code'];
-            } elseif ($fCode === 'ADM4') {
-                $parentCodes['admin1_code'] = $parent['admin1_code'];
-                $parentCodes['admin2_code'] = $parent['admin2_code'];
-                $parentCodes['admin3_code'] = $parent['admin3_code'];
-                $parentCodes['admin4_code'] = $parent['admin4_code'];
-            }
+            if ($fCode === 'ADM1') { $parentCodes['admin1_code'] = $parent['admin1_code']; }
+            elseif ($fCode === 'ADM2') { $parentCodes['admin1_code'] = $parent['admin1_code']; $parentCodes['admin2_code'] = $parent['admin2_code']; }
+            elseif ($fCode === 'ADM3') { $parentCodes['admin1_code'] = $parent['admin1_code']; $parentCodes['admin2_code'] = $parent['admin2_code']; $parentCodes['admin3_code'] = $parent['admin3_code']; }
+            elseif ($fCode === 'ADM4') { $parentCodes['admin1_code'] = $parent['admin1_code']; $parentCodes['admin2_code'] = $parent['admin2_code']; $parentCodes['admin3_code'] = $parent['admin3_code']; $parentCodes['admin4_code'] = $parent['admin4_code']; }
         }
 
         return $this->getChildren($parent['country_code'], $parentCodes, $options);
@@ -229,25 +266,11 @@ class GeonameSearchService
 
     private function applyAdminJoins(QueryBuilder $qb): void
     {
-        $qb->addSelect('a1.name as admin1_name', 'a1.geonameid as admin1_id', 
-                      'a2.name as admin2_name', 'a2.geonameid as admin2_id',
-                      'a3.name as admin3_name', 'a3.geonameid as admin3_id',
-                      'a4.name as admin4_name', 'a4.geonameid as admin4_id',
-                      'a5.name as admin5_name', 'a5.geonameid as admin5_id');
-        
-        $qb->leftJoin('g', $this->admin1Table, 'a1', 
-            'a1.country_code = g.country_code AND a1.admin1_code = g.admin1_code');
-        
-        $qb->leftJoin('g', $this->admin2Table, 'a2', 
-            'a2.country_code = g.country_code AND a2.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code');
-
-        $qb->leftJoin('g', $this->admin3Table, 'a3', 
-            'a3.country_code = g.country_code AND a3.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code AND a3.admin3_code = g.admin3_code');
-
-        $qb->leftJoin('g', $this->admin4Table, 'a4', 
-            'a4.country_code = g.country_code AND a4.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code AND a3.admin3_code = g.admin3_code AND a4.admin4_code = g.admin4_code');
-
-        $qb->leftJoin('g', $this->admin5Table, 'a5', 
-            'a5.country_code = g.country_code AND a5.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code AND a3.admin3_code = g.admin3_code AND a4.admin4_code = g.admin4_code AND a5.admin5_code = g.admin5_code');
+        $qb->addSelect('a1.name as admin1_name', 'a1.geonameid as admin1_id', 'a2.name as admin2_name', 'a2.geonameid as admin2_id', 'a3.name as admin3_name', 'a3.geonameid as admin3_id', 'a4.name as admin4_name', 'a4.geonameid as admin4_id', 'a5.name as admin5_name', 'a5.geonameid as admin5_id');
+        $qb->leftJoin('g', $this->admin1Table, 'a1', 'a1.country_code = g.country_code AND a1.admin1_code = g.admin1_code');
+        $qb->leftJoin('g', $this->admin2Table, 'a2', 'a2.country_code = g.country_code AND a2.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code');
+        $qb->leftJoin('g', $this->admin3Table, 'a3', 'a3.country_code = g.country_code AND a3.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code AND a3.admin3_code = g.admin3_code');
+        $qb->leftJoin('g', $this->admin4Table, 'a4', 'a4.country_code = g.country_code AND a4.admin1_code = g.admin1_code AND a2.admin2_code = g.admin2_code AND a3.admin3_code = g.admin3_code AND a4.admin4_code = g.admin4_code');
+        $qb->leftJoin('g', $this->admin5Table, 'a5', 'a5.country_code = g.country_code AND a5.admin1_code = g.admin1_code AND a5.admin2_code = g.admin2_code AND a3.admin3_code = g.admin3_code AND a4.admin4_code = g.admin4_code AND a5.admin5_code = g.admin5_code');
     }
 }
