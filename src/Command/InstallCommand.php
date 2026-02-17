@@ -79,7 +79,6 @@ class InstallCommand extends Command
         }
 
         // 5. Advanced Search Optimization (Full-Text)
-        // No question here: we follow the choice made in Step 1
         if ($this->fulltextRequested) {
             $this->optimizeDatabase($io);
         }
@@ -110,8 +109,6 @@ class InstallCommand extends Command
 
         if ($fs->exists($configFile)) {
             if (!$io->confirm('Configuration file already exists. Overwrite?', false)) {
-                // We still need to know if fulltext is enabled in existing config for Step 5
-                // but for simplicity in the installer, we assume if they don't overwrite, they manage it manually.
                 return;
             }
         }
@@ -209,7 +206,7 @@ PHP;
         $continentMap = [
             'EU' => 'AD,AL,AT,AX,BA,BE,BG,BY,CH,CY,CZ,DE,DK,EE,ES,FI,FO,FR,GB,GG,GI,GR,HR,HU,IE,IM,IS,IT,JE,LI,LT,LU,LV,MC,MD,ME,MK,MT,NL,NO,PL,PT,RO,RS,RU,SE,SI,SJ,SK,SM,UA,VA',
             'NA' => 'CA,US,MX,BS,CU,DO,HT,JM,PA,CR,NI,HN,SV,GT,BZ',
-            'SA' => 'AR,BO,BR,CL,CO,EC,FK,GY,PY,PE,Suriname,UY,VE',
+            'SA' => 'AR,BO,BR,CL,CO,EC,FK,GY,PY,PE,SR,UY,VE',
             'AS' => 'AF,AM,AZ,BD,BH,BN,BT,CN,GE,ID,IL,IN,IQ,IR,JO,JP,KG,KH,KP,KR,KW,KZ,LA,LB,LK,MM,MN,MY,NP,OM,PH,PK,PS,QA,SA,SG,SY,TH,TJ,TL,TM,TR,TW,UZ,VN,YE',
             'AF' => 'AO,BF,BI,BJ,BW,CD,CF,CG,CI,CM,CV,DJ,DZ,EG,ER,ET,GA,GH,GM,GN,GQ,GW,KE,KM,LR,LS,LY,MA,MG,ML,MR,MU,MW,MZ,NA,NE,NG,RW,SC,SD,SL,SN,SO,SS,ST,SZ,TD,TG,TN,TZ,UG,ZA,ZM,ZW',
             'OC' => 'AU,FJ,KI,MH,FM,NR,NZ,PW,PG,WS,SB,TO,TV,VU',
@@ -218,23 +215,29 @@ PHP;
         $choice = $io->choice('How do you want to select countries to enable?', [
             'manual' => 'Manual entry (comma separated codes)',
             'continents' => 'Select by Continents',
+            'all' => 'Enable ALL countries (Warning: very slow synchronization)',
         ], 'manual');
 
         $enabledCodes = [];
-        if ($choice === 'manual') {
+        if ($choice === 'all') {
+            foreach ($continentMap as $codes) {
+                $enabledCodes = array_merge($enabledCodes, explode(',', $codes));
+            }
+        } elseif ($choice === 'manual') {
             $answer = $io->ask('Enter country codes to enable (e.g. IT,US,FR) or "all" to enable everything', 'IT');
-            $enabledCodes = (strtolower(trim($answer)) === 'all') ? ['ALL'] : array_map('trim', explode(',', $answer));
+            if (strtolower(trim($answer)) === 'all') {
+                foreach ($continentMap as $codes) {
+                    $enabledCodes = array_merge($enabledCodes, explode(',', $codes));
+                }
+            } else {
+                $enabledCodes = array_map('trim', explode(',', $answer));
+            }
         } else {
             $continentChoices = ['EU' => 'Europe (EU)', 'NA' => 'North America (NA)', 'SA' => 'South America (SA)', 'AS' => 'Asia (AS)', 'AF' => 'Africa (AF)', 'OC' => 'Oceania (OC)'];
             $selectedContinents = $io->choice('Select continents (comma separated)', $continentChoices, null, true);
             foreach ($selectedContinents as $continentKey) {
                 $enabledCodes = array_merge($enabledCodes, explode(',', $continentMap[$continentKey]));
             }
-        }
-
-        if (in_array('ALL', $enabledCodes)) {
-            $io->warning('To enable ALL countries, it is recommended to run: UPDATE geocountry SET is_enabled = 1;');
-            $enabledCodes = ['IT', 'US', 'FR', 'DE', 'GB', 'ES'];
         }
 
         $existingCountries = $this->em->getRepository($this->countryEntityClass)->findAll();
