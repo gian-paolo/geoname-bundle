@@ -258,14 +258,7 @@ PHP;
 
         foreach ($enabledCodes as $code) {
             $code = strtoupper(trim($code));
-            if (empty($code)) continue;
-            
-            if (strlen($code) > 2) {
-                $io->warning(sprintf('Skipping invalid country code: "%s" (must be 2 characters)', $code));
-                continue;
-            }
-
-            if (in_array($code, $existingCountryCodes)) continue;
+            if (empty($code) || strlen($code) > 2 || in_array($code, $existingCountryCodes)) continue;
             
             $country = new $this->countryEntityClass();
             $country->setCode($code);
@@ -281,13 +274,8 @@ PHP;
 
         foreach (explode(',', $languagesInput) as $lang) {
             $lang = strtolower(trim($lang));
-            if (empty($lang) || in_array($lang, $existingLangCodes)) continue;
+            if (empty($lang) || strlen($lang) > 7 || in_array($lang, $existingLangCodes)) continue;
             
-            if (strlen($lang) > 7) {
-                $io->warning(sprintf('Skipping invalid language code: "%s" (max 7 characters)', $lang));
-                continue;
-            }
-
             $language = new $this->languageEntityClass();
             $language->setCode($lang);
             $language->setName(strtoupper($lang));
@@ -309,17 +297,37 @@ PHP;
         $geonameMetadata = $this->em->getClassMetadata($this->geonameEntityClass);
         $tableName = $geonameMetadata->getTableName();
         $tableNameQuoted = $platform->quoteIdentifier($tableName);
+        $indexName = 'idx_geoname_fulltext';
 
         $io->section('Advanced Search Optimization');
+
+        // Check if index already exists to avoid heavy wait times
+        $exists = false;
+        try {
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
+                $checkSql = sprintf("SHOW INDEX FROM %s WHERE Key_name = ?", $tableNameQuoted);
+                $exists = !empty($conn->fetchAllAssociative($checkSql, [$indexName]));
+            } elseif (str_contains($platformClass, 'postgresql')) {
+                $checkSql = "SELECT indexname FROM pg_indexes WHERE indexname = ?";
+                $exists = !empty($conn->fetchAllAssociative($checkSql, [$indexName]));
+            }
+        } catch (\Exception $e) {
+            // Fallback to trying to create it if check fails
+        }
+
+        if ($exists) {
+            $io->note('Advanced search optimization already exists. Skipping.');
+            return;
+        }
 
         try {
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $io->note('Creating MySQL/MariaDB Full-Text index...');
-                $sql = sprintf("ALTER TABLE %s ADD FULLTEXT INDEX idx_geoname_fulltext (name, alternate_names)", $tableNameQuoted);
+                $sql = sprintf("ALTER TABLE %s ADD FULLTEXT INDEX %s (name, alternate_names)", $tableNameQuoted, $indexName);
                 $conn->executeStatement($sql);
             } elseif (str_contains($platformClass, 'postgresql')) {
                 $io->note('Creating PostgreSQL GIN index...');
-                $sql = sprintf("CREATE INDEX idx_geoname_fulltext ON %s USING GIN (to_tsvector('simple', name || ' ' || COALESCE(alternate_names, '')))", $tableNameQuoted);
+                $sql = sprintf("CREATE INDEX %s ON %s USING GIN (to_tsvector('simple', name || ' ' || COALESCE(alternate_names, '')))", $indexName, $tableNameQuoted);
                 $conn->executeStatement($sql);
             } else {
                 $io->warning('Full-Text index optimization is not available for this database platform.');
