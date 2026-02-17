@@ -42,7 +42,6 @@ class GeonameImporter
         $this->importEntityClass = $importEntityClass;
         $this->alternateNameEntityClass = $alternateNameEntityClass;
 
-        // Auto-detect correct table names from Doctrine metadata to ensure prefixes/mappings are perfect
         $this->geonameTableName = $this->em->getClassMetadata($geonameEntityClass)->getTableName();
         $this->importTableName = $this->em->getClassMetadata($importEntityClass)->getTableName();
         if ($alternateNameEntityClass) {
@@ -63,6 +62,14 @@ class GeonameImporter
         $this->alternateNameTableName = $alternateNameTableName;
     }
 
+    /**
+     * Resets cumulative memory monitoring.
+     */
+    public function resetMemoryMonitoring(): void
+    {
+        $this->memorySnapshots = [];
+    }
+
     public function importFull(string $url, ?array $allowedCountries = null): void
     {
         $this->disableLogging();
@@ -75,11 +82,10 @@ class GeonameImporter
                 $count = $conn->fetchOne(sprintf("SELECT COUNT(*) FROM %s", $platform->quoteIdentifier($this->geonameTableName)));
                 $this->io->note(sprintf('Table %s contains %d records before starting.', $this->geonameTableName, $count));
                 
-                if ($count > 0) {
-                    $samples = $conn->fetchFirstColumn(sprintf("SELECT geonameid FROM %s LIMIT 5", $platform->quoteIdentifier($this->geonameTableName)));
-                    $this->io->note(sprintf('Sample IDs in DB: %s', implode(', ', $samples)));
+                // Only take START snapshot if not already present (for cumulative tracking across multiple countries)
+                if (!isset($this->memorySnapshots['START'])) {
+                    $this->takeMemorySnapshot('START', get_defined_vars());
                 }
-                $this->takeMemorySnapshot('START', get_defined_vars());
             }
 
             $filePath = $this->downloadFile($url);
@@ -272,7 +278,6 @@ class GeonameImporter
         $platform = $conn->getDatabasePlatform();
         $platformClass = strtolower(get_class($platform));
         
-        // Find which admin level table to use
         $tableName = null;
         $level = null;
         if (str_contains($url, 'admin1Codes')) {
@@ -294,7 +299,7 @@ class GeonameImporter
             foreach ($batch as $row) {
                 if (count($row) < 4) continue;
                 
-                $fullCode = $row[0]; // e.g. "IT.09" or "IT.09.TO"
+                $fullCode = $row[0];
                 if (!empty($allowedCodes) && !in_array($fullCode, $allowedCodes)) {
                     continue;
                 }
@@ -421,7 +426,6 @@ class GeonameImporter
             $targetTableQuoted = $platform->quoteIdentifier($targetTable);
             $importTableQuoted = $platform->quoteIdentifier($this->geonameTableName);
 
-            // 1. Insert new records
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $sqlInsert = sprintf(
                     "INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid)
@@ -444,7 +448,6 @@ class GeonameImporter
             }
             $inserted = $this->executeInternal($sqlInsert, []);
 
-            // 2. Update existing records
             $joinOn = implode(' AND ', array_map(fn($c) => "t." . $platform->quoteIdentifier($c) . " = g." . $platform->quoteIdentifier($c), $cols));
             
             if (str_contains($platformClass, 'postgresql')) {
@@ -661,7 +664,6 @@ class GeonameImporter
                 $row['admin5_code'] = $data['admin5Code'] ?? $data['id'];
             }
 
-            // Use the full code as key to ensure uniqueness within the batch
             $adminData[$fCode][$code] = $row;
         }
 
@@ -769,11 +771,8 @@ class GeonameImporter
 
         $name = substr(trim((string)($row[1] ?? '')), 0, 200);
         $rawAsciiName = trim((string)($row[2] ?? ''));
-        
-        // Always force toAscii even if the file claims it is already ASCII
         $asciiName = $this->toAscii($rawAsciiName !== '' ? $rawAsciiName : $name);
         
-        // Final ultimate protection against null/empty for non-nullable DB columns
         if ($name === '') $name = 'Unknown';
         if ($asciiName === '') $asciiName = 'Unknown';
 
@@ -801,15 +800,9 @@ class GeonameImporter
 
     private function toAscii(string $text): string
     {
-        if ($text === '') {
-            return '';
-        }
-        // Transliterate to ASCII and remove non-convertible characters
+        if ($text === '') return '';
         $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-        if ($converted === false) {
-            return '';
-        }
-        // Remove remaining non-ASCII characters just in case
+        if ($converted === false) return '';
         return (string)preg_replace('/[^\x20-\x7E]/', '', $converted);
     }
 
@@ -860,7 +853,6 @@ class GeonameImporter
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
         
-        // Ensure error is a string and potentially contains stack trace
         $conn->executeStatement(
             sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", 
                 $platform->quoteIdentifier($this->importTableName),
@@ -875,7 +867,6 @@ class GeonameImporter
 
     private function disableLogging(): void
     {
-        // 1. Disable SQLLogger (Legacy DBAL 2)
         $conn = $this->em->getConnection();
         $config = $conn->getConfiguration();
 
@@ -883,12 +874,10 @@ class GeonameImporter
             $config->setSQLLogger(null);
         }
         
-        // 2. Disable Middlewares (DBAL 3+)
         if (method_exists($config, 'setMiddlewares')) {
             $config->setMiddlewares([]);
         }
 
-        // 3. Cache and force disable DebugStack if it exists
         $this->cachedLogger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
         if ($this->cachedLogger && property_exists($this->cachedLogger, 'enabled')) {
             $this->cachedLogger->enabled = false;
@@ -896,19 +885,14 @@ class GeonameImporter
 
         $this->purgeLogger();
 
-        // 4. Force GC to clear any pending buffers
         if (function_exists('gc_mem_caches')) {
             gc_mem_caches();
         }
         gc_collect_cycles();
 
-        // 5. Clear the Entity Manager
         $this->em->clear();
     }
 
-    /**
-     * Forcefully clears query logs from the connection configuration.
-     */
     private function purgeLogger(): void
     {
         if ($this->cachedLogger) {
@@ -918,7 +902,6 @@ class GeonameImporter
                 $this->cachedLogger->queries = [];
             }
         } else {
-            // Fallback if not cached
             $config = $this->em->getConnection()->getConfiguration();
             $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
             if ($logger) {
@@ -1044,7 +1027,6 @@ class GeonameImporter
 
         $totalUpdated = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
-            // 1. Strict Key Consistency Check
             $firstRowKeys = array_keys(reset($chunk));
             $presentProps = [];
             foreach ($firstRowKeys as $prop) {
@@ -1061,14 +1043,12 @@ class GeonameImporter
 
             foreach ($presentProps as $prop => $col) {
                 $colQuoted = $platform->quoteIdentifier($col);
-                // We add "ELSE colQuoted" to protect existing data if a match is missed
                 $setClauses[$col] = "$colQuoted = CASE $pkColumnQuoted ";
             }
 
             foreach ($chunk as $row) {
-                // Verify this row matches the structure of the first row
                 if (array_keys($row) !== $firstRowKeys) {
-                    throw new \InvalidArgumentException("Inconsistent data structure in bulkUpdate batch. All rows must have the same keys.");
+                    throw new \InvalidArgumentException("Inconsistent data structure in bulkUpdate batch.");
                 }
 
                 $pkVal = $row[$pkField] ?? null;
@@ -1082,8 +1062,6 @@ class GeonameImporter
 
             if (empty($pkValues)) continue;
 
-            // Group parameters by column to match SQL structure
-            // UPDATE table SET col1 = CASE WHEN ? THEN ? END, col2 = CASE WHEN ? THEN ? END WHERE id IN (?, ?)
             $sqlParams = [];
             foreach ($presentProps as $prop => $col) {
                 foreach ($chunk as $row) {
@@ -1097,7 +1075,6 @@ class GeonameImporter
                     $sqlParams[] = $val;
                 }
             }
-            // Add PKs for the WHERE IN clause at the end
             foreach ($pkValues as $pk) {
                 $sqlParams[] = $pk;
             }
@@ -1127,9 +1104,6 @@ class GeonameImporter
         return $totalUpdated;
     }
 
-    /**
-     * Maps entity field names to database column names using ClassMetadata.
-     */
     private function getColumnMap(ClassMetadata $metadata): array
     {
         $map = [];
@@ -1165,37 +1139,27 @@ class GeonameImporter
         return array_map('intval', $found);
     }
 
-    /**
-     * Executes a statement using PDO if in debug mode, or Doctrine otherwise.
-     */
     private function executeInternal(string $sql, array $params): int
     {
         $conn = $this->em->getConnection();
-        
         if ($this->debug) {
             $pdo = $conn->getNativeConnection();
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             return $stmt->rowCount();
         }
-
         return $conn->executeStatement($sql, $params);
     }
 
-    /**
-     * Fetches first column using PDO if in debug mode, or Doctrine otherwise.
-     */
     private function fetchAllInternal(string $sql, array $params): array
     {
         $conn = $this->em->getConnection();
-
         if ($this->debug) {
             $pdo = $conn->getNativeConnection();
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             return $stmt->fetchAll(\PDO::FETCH_COLUMN);
         }
-
         return $conn->executeQuery($sql, $params)->fetchFirstColumn();
     }
 
@@ -1208,39 +1172,34 @@ class GeonameImporter
             'globals' => []
         ];
 
-        // Object properties
         foreach (get_object_vars($this) as $name => $value) {
             if ($name === 'memorySnapshots') continue;
             $snapshot['properties'][$name] = $this->estimateSize($value);
         }
 
-        // Local variables
         foreach ($localVars as $name => $value) {
             $snapshot['locals'][$name] = $this->estimateSize($value);
         }
 
-        // External/Global variables
         $skipGlobals = ['GLOBALS', '_SERVER', '_ENV', 'memorySnapshots', 'composerLoader', 'argv', 'argc'];
         foreach ($GLOBALS as $name => $value) {
             if (in_array($name, $skipGlobals, true)) continue;
-            if ($value === $this) continue; // Avoid self-reference
+            if ($value === $this) continue;
             
             $size = $this->estimateSize($value);
-            if ($size > 1024) { // Only track things larger than 1KB to avoid noise
+            if ($size > 1024) {
                 $snapshot['globals'][$name] = $size;
             }
         }
         
         $this->memorySnapshots[$label] = $snapshot;
 
-        // Keep only last few snapshots to avoid memory growth from the snapshots themselves
-        if (count($this->memorySnapshots) > 3) {
+        if (count($this->memorySnapshots) > 5) {
             $keys = array_keys($this->memorySnapshots);
-            // Keep 'START' and the last two
             foreach ($keys as $key) {
                 if ($key !== 'START' && $key !== $label && $key !== end($keys)) {
                     unset($this->memorySnapshots[$key]);
-                    if (count($this->memorySnapshots) <= 3) break;
+                    if (count($this->memorySnapshots) <= 5) break;
                 }
             }
         }
@@ -1258,7 +1217,6 @@ class GeonameImporter
         $diffTotal = ($s2['total'] - $s1['total']) / 1024 / 1024;
         $this->io->writeln(sprintf("├─ Total RAM Change: <info>%+.2f MB</info>", $diffTotal));
 
-        // Properties comparison
         foreach ($s2['properties'] as $name => $size2) {
             $size1 = $s1['properties'][$name] ?? 0;
             if ($size2 > $size1) {
@@ -1267,7 +1225,6 @@ class GeonameImporter
             }
         }
 
-        // Locals comparison
         foreach ($s2['locals'] as $name => $size2) {
             $size1 = $s1['locals'][$name] ?? 0;
             if ($size2 > $size1) {
@@ -1276,7 +1233,6 @@ class GeonameImporter
             }
         }
 
-        // Globals/External comparison
         foreach ($s2['globals'] as $name => $size2) {
             $size1 = $s1['globals'][$name] ?? 0;
             if ($size2 > $size1) {
@@ -1285,7 +1241,6 @@ class GeonameImporter
             }
         }
         
-        // Final check on global growth
         if (abs($diffTotal) > 1 && empty($s2['globals'] ?? []) && empty($s2['properties'] ?? [])) {
             $this->io->writeln("├─ <error>WARNING:</error> RAM grew significantly but no variable growth detected.");
             $this->io->writeln("│  This indicates hidden internal PHP buffers or native extension leaks.");
@@ -1297,7 +1252,6 @@ class GeonameImporter
     {
         try {
             if (is_resource($var)) return 0;
-            // Use serialization to estimate memory footprint
             return strlen(@serialize($var));
         } catch (\Throwable $e) {
             return 0;
