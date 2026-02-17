@@ -767,7 +767,7 @@ class GeonameImporter
             $modificationDate = $date ?: null;
         }
 
-        $name = substr(trim((string)($row[1] ?? '')), 0, 200);
+        $name = $this->sanitizeUtf8(substr(trim((string)($row[1] ?? '')), 0, 200));
         $rawAsciiName = trim((string)($row[2] ?? ''));
         
         // Always force toAscii even if the file claims it is already ASCII
@@ -781,7 +781,7 @@ class GeonameImporter
             'id' => (int)$row[0],
             'name' => $name,
             'asciiName' => substr($asciiName, 0, 200),
-            'alternatenames' => substr((string)($row[3] ?? ''), 0, 10000),
+            'alternatenames' => $this->sanitizeUtf8(substr((string)($row[3] ?? ''), 0, 10000)),
             'latitude' => (float)($row[4] ?? 0),
             'longitude' => (float)($row[5] ?? 0),
             'featureClass' => ($row[6] ?? '') !== '' ? substr((string)$row[6], 0, 1) : null,
@@ -797,6 +797,15 @@ class GeonameImporter
             'modificationDate' => $modificationDate,
             'isDeleted' => false
         ];
+    }
+
+    private function sanitizeUtf8(string $text): string
+    {
+        if ($text === '') {
+            return '';
+        }
+        // Remove invalid UTF-8 sequences
+        return mb_convert_encoding($text, 'UTF-8', 'UTF-8');
     }
 
     private function toAscii(string $text): string
