@@ -33,9 +33,12 @@ class InstallCommand extends Command
         'GeoHierarchy' => 'AbstractGeoHierarchy',
     ];
 
+    private bool $fulltextRequested = false;
+
     public function __construct(
         private readonly string $projectDir,
         private readonly EntityManagerInterface $em,
+        private readonly string $geonameEntityClass,
         private readonly string $countryEntityClass,
         private readonly string $languageEntityClass
     ) {
@@ -76,7 +79,8 @@ class InstallCommand extends Command
         }
 
         // 5. Advanced Search Optimization (Full-Text)
-        if ($io->confirm('Step 5: Optimize database for advanced search? (Full-Text indexes)', true)) {
+        // If they already said yes in Step 1, we use that as default
+        if ($io->confirm('Step 5: Optimize database for advanced search? (Full-Text indexes)', $this->fulltextRequested)) {
             $this->optimizeDatabase($io);
         }
 
@@ -97,8 +101,6 @@ class InstallCommand extends Command
     private function generateConfig(SymfonyStyle $io, string $namespace): void
     {
         $fs = new Filesystem();
-        
-        // Try to find the correct config directory
         $configDir = $this->projectDir . '/config/packages';
         if (!$fs->exists($configDir)) {
             $fs->mkdir($configDir);
@@ -112,10 +114,10 @@ class InstallCommand extends Command
             }
         }
 
-        $useFulltext = $io->confirm('Enable Full-Text search? (Requires MySQL/PostgreSQL)', true);
-        $fulltextString = $useFulltext ? 'true' : 'false';
+        $this->fulltextRequested = $io->confirm('Enable Full-Text search features in configuration?', true);
+        $fulltextString = $this->fulltextRequested ? 'true' : 'false';
 
-        $enableAdmin5 = $io->confirm('Enable Admin5 support? (Sub-municipal divisions, used in countries like France or Belgium)', false);
+        $enableAdmin5 = $io->confirm('Enable Admin5 support?', false);
         $admin5String = $enableAdmin5 ? 'true' : 'false';
 
         $namespace = rtrim($namespace, '\\');
@@ -157,13 +159,11 @@ YAML;
     private function generateEntities(SymfonyStyle $io, string $namespace, string $entityDir): void
     {
         $fs = new Filesystem();
-
         if (!$fs->exists($entityDir)) {
             $fs->mkdir($entityDir);
         }
 
         $namespace = rtrim($namespace, '\\');
-
         foreach (self::ENTITIES as $className => $abstractName) {
             $filePath = $entityDir . '/' . $className . '.php';
             if ($fs->exists($filePath)) {
@@ -193,14 +193,13 @@ PHP;
     {
         $tool = new SchemaTool($this->em);
         $metadatas = $this->em->getMetadataFactory()->getAllMetadata();
-        
         if (empty($metadatas)) {
-            $io->warning('No metadata found. Make sure your entities are correctly configured and registered.');
+            $io->warning('No metadata found.');
             return;
         }
 
         $tool->updateSchema($metadatas, true);
-        $io->success('Database schema updated using SchemaTool.');
+        $io->success('Database schema updated.');
     }
 
     private function setupInitialData(SymfonyStyle $io): void
@@ -220,24 +219,11 @@ PHP;
         ], 'manual');
 
         $enabledCodes = [];
-
         if ($choice === 'manual') {
             $answer = $io->ask('Enter country codes to enable (e.g. IT,US,FR) or "all" to enable everything', 'IT');
-            
-            if (strtolower(trim($answer)) === 'all') {
-                $enabledCodes = ['ALL'];
-            } else {
-                $enabledCodes = array_map('trim', explode(',', $answer));
-            }
+            $enabledCodes = (strtolower(trim($answer)) === 'all') ? ['ALL'] : array_map('trim', explode(',', $answer));
         } else {
-            $continentChoices = [
-                'EU' => 'Europe (EU)',
-                'NA' => 'North America (NA)',
-                'SA' => 'South America (SA)',
-                'AS' => 'Asia (AS)',
-                'AF' => 'Africa (AF)',
-                'OC' => 'Oceania (OC)',
-            ];
+            $continentChoices = ['EU' => 'Europe (EU)', 'NA' => 'North America (NA)', 'SA' => 'South America (SA)', 'AS' => 'Asia (AS)', 'AF' => 'Africa (AF)', 'OC' => 'Oceania (OC)'];
             $selectedContinents = $io->choice('Select continents (comma separated)', $continentChoices, null, true);
             foreach ($selectedContinents as $continentKey) {
                 $enabledCodes = array_merge($enabledCodes, explode(',', $continentMap[$continentKey]));
@@ -245,15 +231,8 @@ PHP;
         }
 
         if (in_array('ALL', $enabledCodes)) {
-            $io->note('Enabling ALL countries (this will take a huge amount of space and time to sync!)');
-            // We'll use a special query or just a large list. 
-            // For now, let's assume the sync command can handle an empty filter or we set a flag.
-            // But since we need to persist GeoCountry entities, let's just use a placeholder or 
-            // the user will have to run a SQL query.
-            // Actually, for "all", it's better to just set a flag for the sync command.
-            // But here we must persist something. Let's just persist some top countries and tell the user.
             $io->warning('To enable ALL countries, it is recommended to run: UPDATE geocountry SET is_enabled = 1;');
-            $enabledCodes = ['IT', 'US', 'FR', 'DE', 'GB', 'ES']; // Fallback for basic setup
+            $enabledCodes = ['IT', 'US', 'FR', 'DE', 'GB', 'ES'];
         }
 
         $existingCountries = $this->em->getRepository($this->countryEntityClass)->findAll();
@@ -261,33 +240,22 @@ PHP;
 
         foreach ($enabledCodes as $code) {
             $code = strtoupper(trim($code));
-            if (empty($code)) continue;
-            
-            if (in_array($code, $existingCountryCodes)) {
-                continue;
-            }
-            
+            if (empty($code) || in_array($code, $existingCountryCodes)) continue;
             $country = new $this->countryEntityClass();
             $country->setCode($code);
             $country->setName($code);
             $country->setIsEnabled(true);
             $this->em->persist($country);
-            $existingCountryCodes[] = $code; // Evita duplicati nello stesso loop
+            $existingCountryCodes[] = $code;
         }
 
         $languagesInput = $io->ask('Enter search languages to enable (comma separated, e.g. it,en)', 'it,en');
-        
         $existingLanguages = $this->em->getRepository($this->languageEntityClass)->findAll();
         $existingLangCodes = array_map(fn($l) => strtolower($l->getCode()), $existingLanguages);
 
         foreach (explode(',', $languagesInput) as $lang) {
             $lang = strtolower(trim($lang));
-            if (empty($lang)) continue;
-
-            if (in_array($lang, $existingLangCodes)) {
-                continue;
-            }
-
+            if (empty($lang) || in_array($lang, $existingLangCodes)) continue;
             $language = new $this->languageEntityClass();
             $language->setCode($lang);
             $language->setName(strtoupper($lang));
@@ -306,32 +274,24 @@ PHP;
         $platform = $conn->getDatabasePlatform();
         $platformClass = strtolower(get_class($platform));
         
-        // Get actual table name for GeoName (including possible prefixes)
-        $geonameMetadata = $this->em->getClassMetadata($this->em->getRepository(AbstractGeoName::class)->getClassName());
+        $geonameMetadata = $this->em->getClassMetadata($this->geonameEntityClass);
         $tableName = $geonameMetadata->getTableName();
         $tableNameQuoted = $platform->quoteIdentifier($tableName);
 
         try {
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $io->note('Creating MySQL/MariaDB Full-Text index...');
-                $sql = sprintf(
-                    "ALTER TABLE %s ADD FULLTEXT INDEX idx_geoname_fulltext (name, ascii_name, alternate_names)",
-                    $tableNameQuoted
-                );
+                $sql = sprintf("ALTER TABLE %s ADD FULLTEXT INDEX idx_geoname_fulltext (name, ascii_name, alternate_names)", $tableNameQuoted);
                 $conn->executeStatement($sql);
             } elseif (str_contains($platformClass, 'postgresql')) {
-                $io->note('Creating PostgreSQL GIN index for Full-Text search...');
-                $sql = sprintf(
-                    "CREATE INDEX idx_geoname_fulltext ON %s USING GIN (to_tsvector('simple', name || ' ' || ascii_name || ' ' || COALESCE(alternate_names, '')))",
-                    $tableNameQuoted
-                );
+                $io->note('Creating PostgreSQL GIN index...');
+                $sql = sprintf("CREATE INDEX idx_geoname_fulltext ON %s USING GIN (to_tsvector('simple', name || ' ' || ascii_name || ' ' || COALESCE(alternate_names, '')))", $tableNameQuoted);
                 $conn->executeStatement($sql);
             } else {
-                $io->warning('Full-Text index optimization is not available for this database platform. Standard indexes will be used.');
+                $io->warning('Full-Text index optimization is not available for this database platform.');
             }
             $io->success('Advanced search optimization completed.');
         } catch (\Exception $e) {
-            // If it already exists, it's fine
             if (str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name')) {
                 $io->note('Advanced search optimization already exists.');
             } else {

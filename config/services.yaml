@@ -54,6 +54,7 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
             $em: '@doctrine.orm.entity_manager'
+            $geonameEntityClass: '%pallari_geoname.entities.geoname%'
             $countryEntityClass: '%pallari_geoname.entities.country%'
             $languageEntityClass: '%pallari_geoname.entities.language%'
         tags: ['console.command']
