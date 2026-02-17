@@ -302,11 +302,11 @@ PHP;
         try {
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
                 $io->note('Creating MySQL/MariaDB Full-Text index...');
-                $sql = sprintf("ALTER TABLE %s ADD FULLTEXT INDEX idx_geoname_fulltext (name, ascii_name, alternate_names)", $tableNameQuoted);
+                $sql = sprintf("ALTER TABLE %s ADD FULLTEXT INDEX idx_geoname_fulltext (name, alternate_names)", $tableNameQuoted);
                 $conn->executeStatement($sql);
             } elseif (str_contains($platformClass, 'postgresql')) {
                 $io->note('Creating PostgreSQL GIN index...');
-                $sql = sprintf("CREATE INDEX idx_geoname_fulltext ON %s USING GIN (to_tsvector('simple', name || ' ' || ascii_name || ' ' || COALESCE(alternate_names, '')))", $tableNameQuoted);
+                $sql = sprintf("CREATE INDEX idx_geoname_fulltext ON %s USING GIN (to_tsvector('simple', name || ' ' || COALESCE(alternate_names, '')))", $tableNameQuoted);
                 $conn->executeStatement($sql);
             } else {
                 $io->warning('Full-Text index optimization is not available for this database platform.');

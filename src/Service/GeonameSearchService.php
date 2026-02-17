@@ -74,10 +74,11 @@ class GeonameSearchService
 
             if ($this->useFulltext && strlen($term) >= 3) {
                 if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
-                    $orConditions[] = 'MATCH(g.name, g.ascii_name, g.alternate_names) AGAINST(:ft_term IN BOOLEAN MODE)';
+                    // Removed ascii_name because it often has a different charset in MySQL
+                    $orConditions[] = 'MATCH(g.name, g.alternate_names) AGAINST(:ft_term IN BOOLEAN MODE)';
                     $qb->setParameter('ft_term', $term . '*');
                 } elseif (str_contains($platformClass, 'postgresql')) {
-                    $orConditions[] = "to_tsvector('simple', g.name || ' ' || g.ascii_name || ' ' || g.alternate_names) @@ to_tsquery('simple', :ft_term)";
+                    $orConditions[] = "to_tsvector('simple', g.name || ' ' || COALESCE(g.alternate_names, '')) @@ to_tsquery('simple', :ft_term)";
                     $qb->setParameter('ft_term', $term . ':*');
                 }
             } else {
@@ -133,7 +134,7 @@ class GeonameSearchService
             $qb->orderBy('g.name', 'ASC');
         } elseif ($orderBy === 'relevance' && $this->useFulltext && strlen($term) >= 3) {
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
-                $qb->addSelect('MATCH(g.name, g.ascii_name, g.alternate_names) AGAINST(:ft_term IN BOOLEAN MODE) as score');
+                $qb->addSelect('MATCH(g.name, g.alternate_names) AGAINST(:ft_term IN BOOLEAN MODE) as score');
                 $qb->orderBy('score', 'DESC');
             } else {
                 $qb->orderBy('g.population', 'DESC');
@@ -205,8 +206,6 @@ class GeonameSearchService
         $fCode = $parent['feature_code'] ?? '';
         $fClass = $parent['feature_class'] ?? '';
 
-        // If it's a country, we only filter by country_code (already handled by getChildren)
-        // If it's an administrative division, we add the corresponding codes
         if ($fClass === 'A') {
             if ($fCode === 'ADM1') {
                 $parentCodes['admin1_code'] = $parent['admin1_code'];
