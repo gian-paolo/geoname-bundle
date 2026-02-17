@@ -6,10 +6,23 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\ArrayParameterType;
 
+/**
+ * High-performance service for searching and navigating GeoNames data.
+ * 
+ * Provides hybrid text search (LIKE + Full-Text), geospatial proximity queries,
+ * and administrative hierarchy navigation.
+ * 
+ * @author Gian-Paolo Pallari
+ */
 class GeonameSearchService
 {
+    /** Minimal columns: only ID and Name */
     public const PRESET_MINIMAL = ['geonameid', 'name'];
+    
+    /** Geospatial columns: ID, Name and Coordinates */
     public const PRESET_GEO = ['geonameid', 'name', 'latitude', 'longitude'];
+    
+    /** All available columns from the main geoname table */
     public const PRESET_FULL = ['geonameid', 'name', 'ascii_name', 'country_code', 'latitude', 'longitude', 'population', 'feature_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code', 'timezone', 'modification_date'];
 
     public function __construct(
@@ -25,7 +38,25 @@ class GeonameSearchService
     ) {}
 
     /**
-     * Search for toponyms with optional administrative names and coordinates.
+     * Search for toponyms using a hybrid strategy (Prefix LIKE + Full-Text).
+     *
+     * @param string $term    The search string (min 3 chars if no other filters are applied).
+     * @param array  $options {
+     *     Optional search criteria:
+     *     @var array  $select            List of columns to return or PRESET_* constant.
+     *     @var array  $countries         Array of 2-letter ISO country codes (e.g. ['IT', 'FR']).
+     *     @var array  $feature_classes   Array of feature classes (e.g. ['P' for cities, 'A' for admin).
+     *     @var array  $feature_codes     Array of specific feature codes (e.g. ['PPL', 'ADM1']).
+     *     @var int    $limit             Maximum number of results (1-1000).
+     *     @var bool   $with_admin_names  If true, joins and returns names for all admin levels.
+     *     @var int    $min_population    Minimum population filter.
+     *     @var int    $id                Filter by specific geonameid.
+     *     @var string $admin1_code       Filter by ADM1 code (Region).
+     *     @var string $admin2_code       Filter by ADM2 code (Province).
+     *     @var string $admin3_code       Filter by ADM3 code (Municipality).
+     *     @var string $order_by          'population_desc' (default), 'name_asc', 'relevance'.
+     * }
+     * @return array List of associative arrays matching the search.
      */
     public function search(string $term, array $options = []): array
     {
@@ -122,7 +153,12 @@ class GeonameSearchService
     }
 
     /**
-     * Get a single toponym by its geonameid.
+     * Retrieve a single record by its geonameid.
+     *
+     * @param int   $id               The unique geonameid.
+     * @param bool  $withAdminNames   Whether to resolve and include administrative labels.
+     * @param array $select           Columns to return (defaults to PRESET_FULL).
+     * @return array|null The record as associative array, or null if not found.
      */
     public function getById(int $id, bool $withAdminNames = false, array $select = self::PRESET_FULL): ?array
     {
@@ -131,8 +167,17 @@ class GeonameSearchService
     }
 
     /**
-     * Get breadcrumbs (ordered administrative chain) for a given geonameid.
-     * Returns an array of arrays: [['name' => 'Italy', 'id' => ...], ['name' => 'Piedmont', ...]]
+     * Build an ordered administrative chain (breadcrumbs) for a toponym.
+     *
+     * Result example:
+     * [
+     *   ['name' => 'Italy', 'geonameid' => 3175395],
+     *   ['name' => 'Piedmont', 'geonameid' => 3170831],
+     *   ['name' => 'Turin', 'geonameid' => 3165524]
+     * ]
+     *
+     * @param int $id The geonameid of the target place.
+     * @return array List of parent units including the item itself.
      */
     public function getBreadcrumbs(int $id): array
     {
@@ -140,9 +185,7 @@ class GeonameSearchService
         if (!$item) return [];
 
         $crumbs = [];
-        $countryCode = $item['country_code'];
-
-        // 1. Resolve Admin Levels using the dedicated fast tables
+        
         $adminLevels = [
             ['table' => $this->admin1Table, 'code' => $item['admin1_code'], 'fields' => ['country_code', 'admin1_code']],
             ['table' => $this->admin2Table, 'code' => $item['admin2_code'], 'fields' => ['country_code', 'admin1_code', 'admin2_code']],
@@ -162,20 +205,28 @@ class GeonameSearchService
             
             $adminData = $qb->executeQuery()->fetchAssociative();
             if ($adminData) {
-                // If the crumb is the item itself, we stop adding parents
                 if ((int)$adminData['geonameid'] === (int)$item['geonameid']) break;
                 $crumbs[] = $adminData;
             }
         }
 
-        // Add the item itself as the last crumb
         $crumbs[] = ['name' => $item['name'], 'geonameid' => $item['geonameid']];
 
         return $crumbs;
     }
 
     /**
-     * Find nearest toponyms to a given coordinate.
+     * Find places nearest to a given GPS coordinate (Reverse Geocoding).
+     * Uses Haversine formula for spherical distance calculation.
+     *
+     * @param float $lat     Latitude.
+     * @param float $lon     Longitude.
+     * @param array $options {
+     *     @var int   $limit            Max results.
+     *     @var array $select           Columns to return.
+     *     @var array $feature_classes  Filter by class (e.g. ['P']).
+     * }
+     * @return array List of records including a 'distance' field (in KM).
      */
     public function findNearest(float $lat, float $lon, array $options = []): array
     {
@@ -183,7 +234,6 @@ class GeonameSearchService
         $select = $options['select'] ?? self::PRESET_GEO;
         foreach ($select as $column) { $qb->addSelect('g.' . $column); }
 
-        // Haversine formula for distance in KM
         $qb->addSelect('(6371 * acos(cos(radians(:lat)) * cos(radians(g.latitude)) * cos(radians(g.longitude) - radians(:lon)) + sin(radians(:lat)) * sin(radians(g.latitude)))) AS distance');
         $qb->from($this->geonameTable, 'g');
         $qb->where('g.is_deleted = 0');
@@ -201,7 +251,18 @@ class GeonameSearchService
     }
 
     /**
-     * Find toponyms within a bounding box.
+     * Find places within a rectangular geographic area.
+     *
+     * @param float $north   North latitude bound.
+     * @param float $east    East longitude bound.
+     * @param float $south   South latitude bound.
+     * @param float $west    West longitude bound.
+     * @param array $options {
+     *     @var int   $limit            Max results.
+     *     @var array $select           Columns to return.
+     *     @var array $feature_classes  Filter by class.
+     * }
+     * @return array List of records within the bounds.
      */
     public function findInBoundingBox(float $north, float $east, float $south, float $west, array $options = []): array
     {
@@ -229,7 +290,12 @@ class GeonameSearchService
     }
 
     /**
-     * Get children or descendants by administrative codes.
+     * Get immediate children or matching records by administrative codes.
+     *
+     * @param string $countryCode 2-letter country code.
+     * @param array  $parentCodes Associative array of codes (e.g. ['admin1_code' => '09']).
+     * @param array  $options     Standard search options.
+     * @return array List of matching records.
      */
     public function getChildren(string $countryCode, array $parentCodes = [], array $options = []): array
     {
@@ -243,7 +309,12 @@ class GeonameSearchService
     }
 
     /**
-     * Get all descendants of a parent toponym by resolving its administrative codes.
+     * Get all descendants of a specific parent by its geonameid.
+     * Automatically resolves the parent's administrative location.
+     *
+     * @param int   $parentId The geonameid of the parent place.
+     * @param array $options  Standard search options (e.g. feature_codes => ['ADM3']).
+     * @return array List of all matching descendants.
      */
     public function getDescendantsByParentId(int $parentId, array $options = []): array
     {
@@ -264,6 +335,9 @@ class GeonameSearchService
         return $this->getChildren($parent['country_code'], $parentCodes, $options);
     }
 
+    /**
+     * Joins administrative tables to the main query to provide name labels.
+     */
     private function applyAdminJoins(QueryBuilder $qb): void
     {
         $qb->addSelect('a1.name as admin1_name', 'a1.geonameid as admin1_id', 'a2.name as admin2_name', 'a2.geonameid as admin2_id', 'a3.name as admin3_name', 'a3.geonameid as admin3_id', 'a4.name as admin4_name', 'a4.geonameid as admin4_id', 'a5.name as admin5_name', 'a5.geonameid as admin5_id');
