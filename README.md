@@ -203,15 +203,33 @@ $city = $searchService->getById(3165524, true);
 Get children or descendants of a specific administrative unit.
 
 ```php
-// Example: Get all cities (ADM3) in the province of Turin (TO)
+// Get all cities (ADM3) in the province of Turin (TO)
 $cities = $searchService->getChildren('IT', [
     'admin1_code' => '09',
     'admin2_code' => 'TO'
 ], ['feature_codes' => ['ADM3']]);
 
-// Example: Get ALL descendants of a parent by its ID
-// This automatically resolves the administrative chain
+// Get ALL descendants of a parent by its ID
+// Automatically resolves the administrative chain
 $allPlaces = $searchService->getDescendantsByParentId(3170831); // Piedmont Region ID
+
+// Get breadcrumbs (ordered chain: Country > Region > Province > ...)
+$crumbs = $searchService->getBreadcrumbs(3165524); // Turin city ID
+// Returns: [['name' => 'Italy', ...], ['name' => 'Piedmont', ...], ['name' => 'Turin', ...]]
+```
+
+### 4. Geospatial Search
+Find places by coordinates.
+
+```php
+// Find the nearest toponyms to a GPS point (Reverse Geocoding)
+$nearby = $searchService->findNearest(45.07, 7.68, [
+    'limit' => 5,
+    'feature_classes' => ['P'] // Only populated places
+]);
+
+// Find all places within a map view (Bounding Box)
+$results = $searchService->findInBoundingBox(46.0, 8.0, 44.0, 7.0);
 ```
 
 ---

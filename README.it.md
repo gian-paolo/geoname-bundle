@@ -201,15 +201,33 @@ $city = $searchService->getById(3165524, true);
 Recupera i "figli" o tutti i "discendenti" di un'unità amministrativa.
 
 ```php
-// Esempio: Ottieni tutti i comuni (ADM3) della provincia di Torino (TO)
+// Ottieni tutti i comuni (ADM3) della provincia di Torino (TO)
 $comuni = $searchService->getChildren('IT', [
     'admin1_code' => '09',
     'admin2_code' => 'TO'
 ], ['feature_codes' => ['ADM3']]);
 
-// Esempio: Ottieni TUTTI i discendenti di un genitore tramite il suo ID
+// Ottieni TUTTI i discendenti di un genitore tramite il suo ID
 // Il bundle risolve automaticamente la catena amministrativa
 $tuttoPiemonte = $searchService->getDescendantsByParentId(3170831); // ID Regione Piemonte
+
+// Ottieni le breadcrumbs (catena ordinata: Stato > Regione > Provincia > ...)
+$crumbs = $searchService->getBreadcrumbs(3165524); // ID città di Torino
+// Ritorna: [['name' => 'Italia', ...], ['name' => 'Piemonte', ...], ['name' => 'Torino', ...]]
+```
+
+### 4. Ricerca Geografica
+Trova località tramite coordinate GPS.
+
+```php
+// Trova i toponimi più vicini a un punto GPS (Reverse Geocoding)
+$vicini = $searchService->findNearest(45.07, 7.68, [
+    'limit' => 5,
+    'feature_classes' => ['P'] // Solo centri abitati
+]);
+
+// Trova tutte le località dentro un'area della mappa (Bounding Box)
+$risultati = $searchService->findInBoundingBox(46.0, 8.0, 44.0, 7.0);
 ```
 
 ---
