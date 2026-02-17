@@ -42,19 +42,19 @@ abstract class AbstractGeoName
     #[ORM\Column(name: 'country_code', length: 2, nullable: true, options: ['fixed' => true, 'charset' => 'ascii'])]
     protected ?string $countryCode = null;
 
-    #[ORM\Column(name: 'admin1_code', length: 20, nullable: true, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin1_code', length: 20, nullable: true)]
     protected ?string $admin1Code = null;
 
-    #[ORM\Column(name: 'admin2_code', length: 80, nullable: true, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin2_code', length: 80, nullable: true)]
     protected ?string $admin2Code = null;
 
-    #[ORM\Column(name: 'admin3_code', length: 20, nullable: true, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin3_code', length: 20, nullable: true)]
     protected ?string $admin3Code = null;
 
-    #[ORM\Column(name: 'admin4_code', length: 20, nullable: true, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin4_code', length: 20, nullable: true)]
     protected ?string $admin4Code = null;
 
-    #[ORM\Column(name: 'admin5_code', length: 20, nullable: true, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin5_code', length: 20, nullable: true)]
     protected ?string $admin5Code = null;
 
     #[ORM\Column(type: Types::BIGINT, nullable: true)]

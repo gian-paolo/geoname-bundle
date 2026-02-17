@@ -12,23 +12,23 @@ abstract class AbstractGeoAdmin5
     protected ?string $countryCode = null;
 
     #[ORM\Id]
-    #[ORM\Column(name: 'admin1_code', length: 20, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin1_code', length: 20)]
     protected ?string $admin1Code = null;
 
     #[ORM\Id]
-    #[ORM\Column(name: 'admin2_code', length: 80, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin2_code', length: 80)]
     protected ?string $admin2Code = null;
 
     #[ORM\Id]
-    #[ORM\Column(name: 'admin3_code', length: 20, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin3_code', length: 20)]
     protected ?string $admin3Code = null;
 
     #[ORM\Id]
-    #[ORM\Column(name: 'admin4_code', length: 20, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin4_code', length: 20)]
     protected ?string $admin4Code = null;
 
     #[ORM\Id]
-    #[ORM\Column(name: 'admin5_code', length: 20, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin5_code', length: 20)]
     protected ?string $admin5Code = null;
 
     #[ORM\Column(length: 200)]

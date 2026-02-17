@@ -12,11 +12,11 @@ abstract class AbstractGeoAdmin2
     protected ?string $countryCode = null;
 
     #[ORM\Id]
-    #[ORM\Column(name: 'admin1_code', length: 20, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin1_code', length: 20)]
     protected ?string $admin1Code = null;
 
     #[ORM\Id]
-    #[ORM\Column(name: 'admin2_code', length: 80, options: ['charset' => 'ascii'])]
+    #[ORM\Column(name: 'admin2_code', length: 80)]
     protected ?string $admin2Code = null;
 
     #[ORM\Column(length: 200)]
