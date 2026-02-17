@@ -82,7 +82,6 @@ class GeonameImporter
                 $count = $conn->fetchOne(sprintf("SELECT COUNT(*) FROM %s", $platform->quoteIdentifier($this->geonameTableName)));
                 $this->io->note(sprintf('Table %s contains %d records before starting.', $this->geonameTableName, $count));
                 
-                // Only take START snapshot if not already present (for cumulative tracking across multiple countries)
                 if (!isset($this->memorySnapshots['START'])) {
                     $this->takeMemorySnapshot('START', get_defined_vars());
                 }
@@ -165,9 +164,9 @@ class GeonameImporter
                 if (count($row) < 2) continue;
                 
                 $placeholders[] = '(?, ?, ?)';
-                $values[] = (int)$row[0]; // parentid
-                $values[] = (int)$row[1]; // childid
-                $values[] = $row[2] ?? null; // type
+                $values[] = (int)$row[0];
+                $values[] = (int)$row[1];
+                $values[] = $row[2] ?? null;
                 $total++;
             }
 
@@ -217,8 +216,8 @@ class GeonameImporter
             $dataToProcess[$id] = [
                 'id' => $id,
                 'geonameId' => (int)$row[1],
-                'isoLanguage' => substr($lang, 0, 7),
-                'alternateName' => $row[3],
+                'isoLanguage' => mb_substr((string)$lang, 0, 7),
+                'alternateName' => mb_substr((string)$row[3], 0, 200), // Adjusted to 200 as per common alternate name length
                 'isPreferredName' => ($row[4] ?? '') === '1',
                 'isShortName' => ($row[5] ?? '') === '1',
                 'isColloquial' => ($row[6] ?? '') === '1',
@@ -251,15 +250,12 @@ class GeonameImporter
     {
         $dateStr = $date->format('Y-m-d');
         
-        // 1. Deletes
         $deleteUrl = sprintf('https://download.geonames.org/export/dump/deletes-%s.txt', $dateStr);
         $this->importIncremental($deleteUrl, 'daily_delete', [], true);
 
-        // 2. Modifications
         $modUrl = sprintf('https://download.geonames.org/export/dump/modifications-%s.txt', $dateStr);
         $this->importIncremental($modUrl, 'daily_modification', $allowedCountries);
 
-        // 3. Alternate Names Updates
         if ($withAlternateNames && $this->alternateNameEntityClass) {
             $altModUrl = sprintf('https://download.geonames.org/export/dump/alternateNamesModifications-%s.txt', $dateStr);
             $this->importIncremental($altModUrl, 'daily_alternate_modification', [], false, true);
@@ -307,20 +303,20 @@ class GeonameImporter
                 $codeParts = explode('.', $fullCode);
                 if ($level === 1 && count($codeParts) === 2) {
                     $placeholders[] = '(?, ?, ?, ?, ?)';
-                    $values[] = $codeParts[0]; // country
-                    $values[] = $codeParts[1]; // admin1
-                    $values[] = $row[1]; // name
-                    $values[] = $row[2]; // ascii_name
-                    $values[] = (int)$row[3]; // geonameid
+                    $values[] = $codeParts[0];
+                    $values[] = $codeParts[1];
+                    $values[] = mb_substr((string)$row[1], 0, 200);
+                    $values[] = mb_substr((string)$row[2], 0, 200);
+                    $values[] = (int)$row[3];
                     $total++;
                 } elseif ($level === 2 && count($codeParts) === 3) {
                     $placeholders[] = '(?, ?, ?, ?, ?, ?)';
-                    $values[] = $codeParts[0]; // country
-                    $values[] = $codeParts[1]; // admin1
-                    $values[] = $codeParts[2]; // admin2
-                    $values[] = $row[1]; // name
-                    $values[] = $row[2]; // ascii_name
-                    $values[] = (int)$row[3]; // geonameid
+                    $values[] = $codeParts[0];
+                    $values[] = $codeParts[1];
+                    $values[] = $codeParts[2];
+                    $values[] = mb_substr((string)$row[1], 0, 200);
+                    $values[] = mb_substr((string)$row[2], 0, 200);
+                    $values[] = (int)$row[3];
                     $total++;
                 }
             }
@@ -335,38 +331,19 @@ class GeonameImporter
                 $sql = sprintf(
                     "INSERT INTO %s (%s, %s, %s, %s) VALUES %s 
                      ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)",
-                    $sqlTableName,
-                    $colsList,
-                    $platform->quoteIdentifier('name'),
-                    $platform->quoteIdentifier('ascii_name'),
-                    $platform->quoteIdentifier('geonameid'),
-                    implode(', ', $placeholders),
-                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
-                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
-                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
+                    $sqlTableName, $colsList, $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'),
+                    implode(', ', $placeholders), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
                 );
             } elseif (str_contains($platformClass, 'postgresql') || str_contains($platformClass, 'sqlite')) {
                 $sql = sprintf(
                     "INSERT INTO %s (%s, %s, %s, %s) VALUES %s 
                      ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s, %s = EXCLUDED.%s",
-                    $sqlTableName,
-                    $colsList,
-                    $platform->quoteIdentifier('name'),
-                    $platform->quoteIdentifier('ascii_name'),
-                    $platform->quoteIdentifier('geonameid'),
-                    implode(', ', $placeholders),
-                    $colsList,
-                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
-                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
-                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
+                    $sqlTableName, $colsList, $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'),
+                    implode(', ', $placeholders), $colsList, $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
                 );
-            } else {
-                continue;
-            }
-            
+            } else { continue; }
             $this->executeInternal($sql, $values);
         }
-        
         unlink($filePath);
         return $total;
     }
@@ -375,22 +352,16 @@ class GeonameImporter
     {
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
-        
         $codeExpr = match (strtoupper($level)) {
             'ADM1' => "CONCAT(country_code, '.', admin1_code)",
             'ADM2' => "CONCAT(country_code, '.', admin1_code, '.', admin2_code)",
             default => null
         };
-
         if (!$codeExpr) return [];
-
-        $sql = sprintf(
-            "SELECT DISTINCT %s as code FROM %s WHERE country_code IN (?) AND %s != ''",
-            $codeExpr,
-            $platform->quoteIdentifier($this->importTableName),
+        $sql = sprintf("SELECT DISTINCT %s as code FROM %s WHERE country_code IN (?) AND %s != ''",
+            $codeExpr, $platform->quoteIdentifier($this->importTableName),
             str_contains($level, '1') ? $platform->quoteIdentifier('admin1_code') : $platform->quoteIdentifier('admin2_code')
         );
-
         return $this->fetchAllInternal($sql, [$allowedCountries]);
     }
 
@@ -405,14 +376,9 @@ class GeonameImporter
         foreach ($levels as $level) {
             $targetTable = $this->adminTableNames[strtolower($level)] ?? null;
             if (!$targetTable) continue;
-
             $where = ["g.feature_code = " . $conn->quote($level)];
-            if (!empty($allowedCountries)) {
-                $where[] = "g.country_code IN (" . implode(',', array_map([$conn, 'quote'], $allowedCountries)) . ")";
-            }
-
+            if (!empty($allowedCountries)) { $where[] = "g.country_code IN (" . implode(',', array_map([$conn, 'quote'], $allowedCountries)) . ")"; }
             $whereSql = implode(' AND ', $where);
-
             $cols = match ($level) {
                 'ADM1' => ['country_code', 'admin1_code'],
                 'ADM2' => ['country_code', 'admin1_code', 'admin2_code'],
@@ -420,58 +386,28 @@ class GeonameImporter
                 'ADM4' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'],
                 'ADM5' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'],
             };
-            
             $colsQuoted = array_map(fn($c) => $platform->quoteIdentifier($c), $cols);
             $colsList = implode(', ', $colsQuoted);
             $targetTableQuoted = $platform->quoteIdentifier($targetTable);
             $importTableQuoted = $platform->quoteIdentifier($this->geonameTableName);
 
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
-                $sqlInsert = sprintf(
-                    "INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid)
-                     SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g
-                     WHERE %s",
-                    $targetTableQuoted, $colsList, 
-                    implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)),
-                    $importTableQuoted, $whereSql
-                );
+                $sqlInsert = sprintf("INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid) SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g WHERE %s",
+                    $targetTableQuoted, $colsList, implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)), $importTableQuoted, $whereSql);
             } else {
-                $sqlInsert = sprintf(
-                    "INSERT INTO %s (%s, name, ascii_name, geonameid)
-                     SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g
-                     WHERE %s
-                     ON CONFLICT (%s) DO NOTHING",
-                    $targetTableQuoted, $colsList,
-                    implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)),
-                    $importTableQuoted, $whereSql, $colsList
-                );
+                $sqlInsert = sprintf("INSERT INTO %s (%s, name, ascii_name, geonameid) SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g WHERE %s ON CONFLICT (%s) DO NOTHING",
+                    $targetTableQuoted, $colsList, implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)), $importTableQuoted, $whereSql, $colsList);
             }
             $inserted = $this->executeInternal($sqlInsert, []);
-
             $joinOn = implode(' AND ', array_map(fn($c) => "t." . $platform->quoteIdentifier($c) . " = g." . $platform->quoteIdentifier($c), $cols));
-            
             if (str_contains($platformClass, 'postgresql')) {
-                $sqlUpdate = sprintf(
-                    "UPDATE %s t
-                     SET name = g.name, ascii_name = g.ascii_name, geonameid = g.geonameid
-                     FROM %s g
-                     WHERE %s AND %s",
-                    $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql
-                );
+                $sqlUpdate = sprintf("UPDATE %s t SET name = g.name, ascii_name = g.ascii_name, geonameid = g.geonameid FROM %s g WHERE %s AND %s", $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql);
             } else {
-                $sqlUpdate = sprintf(
-                    "UPDATE %s t
-                     INNER JOIN %s g ON %s
-                     SET t.name = g.name, t.ascii_name = g.ascii_name, t.geonameid = g.geonameid
-                     WHERE %s",
-                    $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql
-                );
+                $sqlUpdate = sprintf("UPDATE %s t INNER JOIN %s g ON %s SET t.name = g.name, t.ascii_name = g.ascii_name, t.geonameid = g.geonameid WHERE %s", $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql);
             }
             $updated = $this->executeInternal($sqlUpdate, []);
-            
             $stats[$level] = $inserted + $updated;
         }
-
         return $stats;
     }
 
@@ -479,36 +415,24 @@ class GeonameImporter
     {
         $this->disableLogging();
         $filePath = $this->downloadFile($url);
-        if (str_ends_with($url, '.zip')) {
-            $filePath = $this->unzip($filePath);
-        }
-
+        if (str_ends_with($url, '.zip')) { $filePath = $this->unzip($filePath); }
         $total = 0;
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
-
         foreach ($this->parser->getBatches($filePath, 2000) as $batch) {
             $sql = sprintf("UPDATE %s SET admin5_code = CASE geonameid ", $platform->quoteIdentifier($tableName));
-            $ids = [];
-            $values = [];
+            $ids = []; $values = [];
             foreach ($batch as $row) {
                 if (count($row) < 2) continue;
-                $id = (int)$row[0];
-                $code = $row[1];
-                $sql .= "WHEN ? THEN ? ";
-                $values[] = $id;
-                $values[] = $code;
-                $ids[] = $id;
-                $total++;
+                $id = (int)$row[0]; $code = $row[1];
+                $sql .= "WHEN ? THEN ? "; $values[] = $id; $values[] = $code; $ids[] = $id; $total++;
             }
             $sql .= "END WHERE geonameid IN (" . implode(',', array_fill(0, count($ids), '?')) . ")";
-            
             if (!empty($ids)) {
                 $allParams = array_merge($values, $ids);
                 $this->executeInternal($sql, $allParams);
             }
         }
-
         if (file_exists($filePath)) unlink($filePath);
         return $total;
     }
@@ -516,24 +440,16 @@ class GeonameImporter
     private function importIncremental(string $url, string $type, array $allowedCountries = [], bool $isDelete = false, bool $isAlternate = false): void
     {
         $importLog = $this->createImportLog($type, $url);
-        
         try {
             $filePath = $this->downloadFile($url);
             $totalProcessed = 0;
             foreach ($this->parser->getBatches($filePath, 500) as $batch) {
                 if ($isAlternate) {
-                    if ($isDelete) {
-                        $totalProcessed += $this->processAlternateDeleteBatch($batch);
-                    } else {
-                        $totalProcessed += $this->processAlternateNameBatch($batch, null);
-                    }
+                    if ($isDelete) { $totalProcessed += $this->processAlternateDeleteBatch($batch); }
+                    else { $totalProcessed += $this->processAlternateNameBatch($batch, null); }
                 } else {
-                    if ($isDelete) {
-                        $totalProcessed += $this->processDeleteBatch($batch);
-                    } else {
-                        $results = $this->processHybridBatch($batch, $allowedCountries);
-                        $totalProcessed += ($results['inserted'] + $results['updated']);
-                    }
+                    if ($isDelete) { $totalProcessed += $this->processDeleteBatch($batch); }
+                    else { $results = $this->processHybridBatch($batch, $allowedCountries); $totalProcessed += ($results['inserted'] + $results['updated']); }
                 }
                 $this->updateImportLog($importLog, $totalProcessed);
             }
@@ -545,160 +461,65 @@ class GeonameImporter
         }
     }
 
-    /**
-     * @return array{inserted: int, updated: int, modified: int, skipped: int}
-     */
     private function processHybridBatch(array $batch, ?array $allowedCountries): array
     {
-        $toProcess = [];
-        $ids = [];
-        $skipped = 0;
-
+        $toProcess = []; $ids = []; $skipped = 0;
         foreach ($batch as $row) {
-            if (count($row) < 19) {
-                $skipped++;
-                continue;
-            }
-            
+            if (count($row) < 19) { $skipped++; continue; }
             $countryCode = strtoupper(trim($row[8] ?? ''));
-            if ($allowedCountries !== null && !empty($allowedCountries) && !in_array($countryCode, $allowedCountries, true)) {
-                $skipped++;
-                continue;
-            }
-
+            if ($allowedCountries !== null && !empty($allowedCountries) && !in_array($countryCode, $allowedCountries, true)) { $skipped++; continue; }
             $data = $this->mapRowToData($row);
-            $id = (int)$data['id'];
-            $toProcess[$id] = $data;
-            $ids[] = $id;
+            $id = (int)$data['id']; $toProcess[$id] = $data; $ids[] = $id;
         }
-
-        if (empty($ids)) {
-            return ['inserted' => 0, 'updated' => 0, 'modified' => 0, 'skipped' => $skipped];
-        }
-
+        if (empty($ids)) { return ['inserted' => 0, 'updated' => 0, 'modified' => 0, 'skipped' => $skipped]; }
         $existingIds = $this->findExistingIds($this->geonameEntityClass, $ids);
         $existingIds = array_map('intval', $existingIds);
-        
-        $toUpdate = [];
-        $toInsert = [];
-
+        $toUpdate = []; $toInsert = [];
         foreach ($toProcess as $id => $data) {
-            if (in_array($id, $existingIds, true)) {
-                $toUpdate[] = $data;
-            } else {
-                $toInsert[] = $data;
-            }
+            if (in_array($id, $existingIds, true)) { $toUpdate[] = $data; }
+            else { $toInsert[] = $data; }
         }
-
-        $insertedCount = count($toInsert);
-        $updatedCount = count($toUpdate);
-        $actualModified = 0;
-
-        if (!empty($toInsert)) {
-            $this->bulkInsert($this->geonameEntityClass, $toInsert);
-            $toInsert = null;
-        }
-        if (!empty($toUpdate)) {
-            $actualModified = $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
-            $toUpdate = null;
-        }
-
+        $insertedCount = count($toInsert); $updatedCount = count($toUpdate); $actualModified = 0;
+        if (!empty($toInsert)) { $this->bulkInsert($this->geonameEntityClass, $toInsert); $toInsert = null; }
+        if (!empty($toUpdate)) { $actualModified = $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id'); $toUpdate = null; }
         $this->syncAdminTablesFromBatch($toProcess);
-        
-        $toProcess = null;
-        $ids = null;
-        $existingIds = null;
-
-        return [
-            'inserted' => $insertedCount, 
-            'updated' => $updatedCount, 
-            'modified' => $actualModified, 
-            'skipped' => $skipped
-        ];
+        return ['inserted' => $insertedCount, 'updated' => $updatedCount, 'modified' => $actualModified, 'skipped' => $skipped];
     }
 
     private function syncAdminTablesFromBatch(array $batch): void
     {
         if (empty($this->adminTableNames)) return;
-
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
         $platformClass = strtolower(get_class($platform));
-
-        $adminData = [
-            'ADM1' => [],
-            'ADM2' => [],
-            'ADM3' => [],
-            'ADM4' => [],
-            'ADM5' => [],
-        ];
-
+        $adminData = ['ADM1' => [], 'ADM2' => [], 'ADM3' => [], 'ADM4' => [], 'ADM5' => []];
         foreach ($batch as $data) {
             $fCode = $data['featureCode'];
             if (!isset($adminData[$fCode])) continue;
-
             $code = $data['countryCode'] . '.' . $data['admin1Code'];
             if (in_array($fCode, ['ADM2', 'ADM3', 'ADM4', 'ADM5'])) $code .= '.' . $data['admin2Code'];
             if (in_array($fCode, ['ADM3', 'ADM4', 'ADM5'])) $code .= '.' . $data['admin3Code'];
             if (in_array($fCode, ['ADM4', 'ADM5'])) $code .= '.' . $data['admin4Code'];
             if ($fCode === 'ADM5') $code .= '.' . ($data['admin5Code'] ?? $data['id']);
-
-            $row = [
-                'country_code' => $data['countryCode'],
-                'admin1_code' => $data['admin1Code'],
-                'name' => $data['name'],
-                'ascii_name' => $data['asciiName'],
-                'geonameid' => $data['id']
-            ];
-
-            if (in_array($fCode, ['ADM2', 'ADM3', 'ADM4', 'ADM5'])) {
-                $row['admin2_code'] = $data['admin2Code'];
-            }
-            if (in_array($fCode, ['ADM3', 'ADM4', 'ADM5'])) {
-                $row['admin3_code'] = $data['admin3Code'];
-            }
-            if (in_array($fCode, ['ADM4', 'ADM5'])) {
-                $row['admin4_code'] = $data['admin4Code'];
-            }
-            if ($fCode === 'ADM5') {
-                $row['admin5_code'] = $data['admin5Code'] ?? $data['id'];
-            }
-
+            $row = ['country_code' => $data['countryCode'], 'admin1_code' => $data['admin1Code'], 'name' => $data['name'], 'ascii_name' => $data['asciiName'], 'geonameid' => $data['id']];
+            if (in_array($fCode, ['ADM2', 'ADM3', 'ADM4', 'ADM5'])) { $row['admin2_code'] = $data['admin2Code']; }
+            if (in_array($fCode, ['ADM3', 'ADM4', 'ADM5'])) { $row['admin3_code'] = $data['admin3Code']; }
+            if (in_array($fCode, ['ADM4', 'ADM5'])) { $row['admin4_code'] = $data['admin4Code']; }
+            if ($fCode === 'ADM5') { $row['admin5_code'] = $data['admin5Code'] ?? $data['id']; }
             $adminData[$fCode][$code] = $row;
         }
-
         foreach ($adminData as $level => $rows) {
             $tableName = $this->adminTableNames[strtolower($level)] ?? null;
             if (!$tableName || empty($rows)) continue;
-
-            $firstRow = reset($rows);
-            $cols = array_keys($firstRow);
-            $placeholders = [];
-            $values = [];
+            $firstRow = reset($rows); $cols = array_keys($firstRow);
+            $placeholders = []; $values = [];
             $qs = '(' . implode(', ', array_fill(0, count($cols), '?')) . ')';
-
-            foreach ($rows as $row) {
-                $placeholders[] = $qs;
-                foreach ($cols as $col) {
-                    $values[] = $row[$col];
-                }
-            }
-
+            foreach ($rows as $row) { $placeholders[] = $qs; foreach ($cols as $col) { $values[] = $row[$col]; } }
             $colsQuotedArr = array_map(fn($c) => $platform->quoteIdentifier($c), $cols);
             $colsList = implode(', ', $colsQuotedArr);
             $sqlTableName = $platform->quoteIdentifier($tableName);
-
             if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
-                $sql = sprintf(
-                    "INSERT INTO %s (%s) VALUES %s 
-                     ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)",
-                    $sqlTableName,
-                    $colsList,
-                    implode(', ', $placeholders),
-                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
-                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
-                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
-                );
+                $sql = sprintf("INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)", $sqlTableName, $colsList, implode(', ', $placeholders), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid'));
             } elseif (str_contains($platformClass, 'postgresql') || str_contains($platformClass, 'sqlite')) {
                 $pkCols = [];
                 if (str_contains($tableName, 'admin1')) $pkCols = ['country_code', 'admin1_code'];
@@ -706,58 +527,27 @@ class GeonameImporter
                 elseif (str_contains($tableName, 'admin3')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code'];
                 elseif (str_contains($tableName, 'admin4')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'];
                 elseif (str_contains($tableName, 'admin5')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'];
-
                 $pkColsQuoted = implode(', ', array_map(fn($c) => $platform->quoteIdentifier($c), $pkCols));
-
-                $sql = sprintf(
-                    "INSERT INTO %s (%s) VALUES %s 
-                     ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s, %s = EXCLUDED.%s",
-                    $sqlTableName,
-                    $colsList,
-                    implode(', ', $placeholders),
-                    $pkColsQuoted,
-                    $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'),
-                    $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'),
-                    $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')
-                );
-            } else {
-                continue;
-            }
+                $sql = sprintf("INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s, %s = EXCLUDED.%s", $sqlTableName, $colsList, implode(', ', $placeholders), $pkColsQuoted, $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid'));
+            } else { continue; }
             $this->executeInternal($sql, $values);
         }
     }
 
     private function processDeleteBatch(array $batch): int
     {
-        $ids = [];
-        foreach ($batch as $row) {
-            if (count($row) < 1) continue;
-            $ids[] = (int)$row[0];
-        }
-
+        $ids = []; foreach ($batch as $row) { if (count($row) < 1) continue; $ids[] = (int)$row[0]; }
         if (empty($ids)) return 0;
-
         $deleteData = array_map(fn($id) => ['id' => $id, 'isDeleted' => true], $ids);
         return $this->bulkUpdate($this->geonameEntityClass, $deleteData, 'id');
     }
 
     private function processAlternateDeleteBatch(array $batch): int
     {
-        $ids = [];
-        foreach ($batch as $row) {
-            if (count($row) < 1) continue;
-            $ids[] = (int)$row[0];
-        }
-
+        $ids = []; foreach ($batch as $row) { if (count($row) < 1) continue; $ids[] = (int)$row[0]; }
         if (empty($ids)) return 0;
-
-        $conn = $this->em->getConnection();
-        $platform = $conn->getDatabasePlatform();
-        
-        $sql = sprintf("DELETE FROM %s WHERE %s IN (?)", 
-            $platform->quoteIdentifier($this->alternateNameTableName),
-            $platform->quoteIdentifier('alternatenameid')
-        );
+        $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform();
+        $sql = sprintf("DELETE FROM %s WHERE %s IN (?)", $platform->quoteIdentifier($this->alternateNameTableName), $platform->quoteIdentifier('alternatenameid'));
         return $conn->executeStatement($sql, [$ids], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
     }
 
@@ -769,7 +559,8 @@ class GeonameImporter
             $modificationDate = $date ?: null;
         }
 
-        $name = substr(trim((string)($row[1] ?? '')), 0, 200);
+        // CRITICAL FIX: Use mb_substr to avoid splitting UTF-8 characters
+        $name = mb_substr(trim((string)($row[1] ?? '')), 0, 200);
         $rawAsciiName = trim((string)($row[2] ?? ''));
         $asciiName = $this->toAscii($rawAsciiName !== '' ? $rawAsciiName : $name);
         
@@ -779,20 +570,20 @@ class GeonameImporter
         return [
             'id' => (int)$row[0],
             'name' => $name,
-            'asciiName' => substr($asciiName, 0, 200),
-            'alternatenames' => substr((string)($row[3] ?? ''), 0, 10000),
+            'asciiName' => mb_substr($asciiName, 0, 200),
+            'alternatenames' => mb_substr((string)($row[3] ?? ''), 0, 10000),
             'latitude' => (float)($row[4] ?? 0),
             'longitude' => (float)($row[5] ?? 0),
-            'featureClass' => ($row[6] ?? '') !== '' ? substr((string)$row[6], 0, 1) : null,
-            'featureCode' => ($row[7] ?? '') !== '' ? substr((string)$row[7], 0, 10) : null,
-            'countryCode' => ($row[8] ?? '') !== '' ? substr(strtoupper((string)$row[8]), 0, 2) : null,
-            'admin1Code' => substr((string)($row[10] ?? ''), 0, 20),
-            'admin2Code' => substr((string)($row[11] ?? ''), 0, 80),
-            'admin3Code' => substr((string)($row[12] ?? ''), 0, 20),
-            'admin4Code' => substr((string)($row[13] ?? ''), 0, 20),
+            'featureClass' => ($row[6] ?? '') !== '' ? mb_substr((string)$row[6], 0, 1) : null,
+            'featureCode' => ($row[7] ?? '') !== '' ? mb_substr((string)$row[7], 0, 10) : null,
+            'countryCode' => ($row[8] ?? '') !== '' ? mb_substr(strtoupper((string)$row[8]), 0, 2) : null,
+            'admin1Code' => mb_substr((string)($row[10] ?? ''), 0, 20),
+            'admin2Code' => mb_substr((string)($row[11] ?? ''), 0, 80),
+            'admin3Code' => mb_substr((string)($row[12] ?? ''), 0, 20),
+            'admin4Code' => mb_substr((string)($row[13] ?? ''), 0, 20),
             'population' => ($row[14] ?? '') !== '' ? (string)$row[14] : null,
             'elevation' => ($row[15] ?? '') !== '' ? (int)$row[15] : null,
-            'timezone' => substr((string)($row[17] ?? ''), 0, 40),
+            'timezone' => mb_substr((string)($row[17] ?? ''), 0, 40),
             'modificationDate' => $modificationDate,
             'isDeleted' => false
         ];
@@ -808,108 +599,51 @@ class GeonameImporter
 
     private function createImportLog(string $type, string $url): AbstractGeoImport
     {
-        $log = new $this->importEntityClass();
-        $log->setType($type);
-        $log->setStatus(AbstractGeoImport::STATUS_RUNNING);
-        $log->setDetails("Source: $url");
-        $this->em->persist($log);
-        $this->em->flush();
-        return $log;
+        $log = new $this->importEntityClass(); $log->setType($type); $log->setStatus(AbstractGeoImport::STATUS_RUNNING); $log->setDetails("Source: $url");
+        $this->em->persist($log); $this->em->flush(); return $log;
     }
 
     private function updateImportLog(AbstractGeoImport $log, int $count): void
     {
-        $conn = $this->em->getConnection();
-        $platform = $conn->getDatabasePlatform();
-        $conn->executeStatement(
-            sprintf("UPDATE %s SET %s = ? WHERE %s = ?", 
-                $platform->quoteIdentifier($this->importTableName),
-                $platform->quoteIdentifier('records_processed'),
-                $platform->quoteIdentifier('id')
-            ),
-            [$count, $log->getId()]
-        );
+        $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform();
+        $conn->executeStatement(sprintf("UPDATE %s SET %s = ? WHERE %s = ?", $platform->quoteIdentifier($this->importTableName), $platform->quoteIdentifier('records_processed'), $platform->quoteIdentifier('id')), [$count, $log->getId()]);
     }
 
     private function completeImportLog(AbstractGeoImport $log, int $count): void
     {
-        $conn = $this->em->getConnection();
-        $platform = $conn->getDatabasePlatform();
-        $conn->executeStatement(
-            sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", 
-                $platform->quoteIdentifier($this->importTableName),
-                $platform->quoteIdentifier('status'),
-                $platform->quoteIdentifier('records_processed'),
-                $platform->quoteIdentifier('ended_at'),
-                $platform->quoteIdentifier('id')
-            ),
-            [AbstractGeoImport::STATUS_COMPLETED, $count, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
-        );
+        $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform();
+        $conn->executeStatement(sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", $platform->quoteIdentifier($this->importTableName), $platform->quoteIdentifier('status'), $platform->quoteIdentifier('records_processed'), $platform->quoteIdentifier('ended_at'), $platform->quoteIdentifier('id')), [AbstractGeoImport::STATUS_COMPLETED, $count, (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]);
     }
 
     private function failImportLog(AbstractGeoImport $log, string $error): void
     {
         if (!$this->em->isOpen()) return;
-        $conn = $this->em->getConnection();
-        $platform = $conn->getDatabasePlatform();
-        
-        $conn->executeStatement(
-            sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", 
-                $platform->quoteIdentifier($this->importTableName),
-                $platform->quoteIdentifier('status'),
-                $platform->quoteIdentifier('error_message'),
-                $platform->quoteIdentifier('ended_at'),
-                $platform->quoteIdentifier('id')
-            ),
-            [AbstractGeoImport::STATUS_FAILED, substr($error, 0, 65535), (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]
-        );
+        $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform();
+        $conn->executeStatement(sprintf("UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?", $platform->quoteIdentifier($this->importTableName), $platform->quoteIdentifier('status'), $platform->quoteIdentifier('error_message'), $platform->quoteIdentifier('ended_at'), $platform->quoteIdentifier('id')), [AbstractGeoImport::STATUS_FAILED, substr($error, 0, 65535), (new \DateTime())->format('Y-m-d H:i:s'), $log->getId()]);
     }
 
     private function disableLogging(): void
     {
-        $conn = $this->em->getConnection();
-        $config = $conn->getConfiguration();
-
-        if (method_exists($config, 'setSQLLogger')) {
-            $config->setSQLLogger(null);
-        }
-        
-        if (method_exists($config, 'setMiddlewares')) {
-            $config->setMiddlewares([]);
-        }
-
+        $conn = $this->em->getConnection(); $config = $conn->getConfiguration();
+        if (method_exists($config, 'setSQLLogger')) { $config->setSQLLogger(null); }
+        if (method_exists($config, 'setMiddlewares')) { $config->setMiddlewares([]); }
         $this->cachedLogger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
-        if ($this->cachedLogger && property_exists($this->cachedLogger, 'enabled')) {
-            $this->cachedLogger->enabled = false;
-        }
-
+        if ($this->cachedLogger && property_exists($this->cachedLogger, 'enabled')) { $this->cachedLogger->enabled = false; }
         $this->purgeLogger();
-
-        if (function_exists('gc_mem_caches')) {
-            gc_mem_caches();
-        }
-        gc_collect_cycles();
-
-        $this->em->clear();
+        if (function_exists('gc_mem_caches')) { gc_mem_caches(); }
+        gc_collect_cycles(); $this->em->clear();
     }
 
     private function purgeLogger(): void
     {
         if ($this->cachedLogger) {
-            if (method_exists($this->cachedLogger, 'clearQueries')) {
-                $this->cachedLogger->clearQueries();
-            } elseif (property_exists($this->cachedLogger, 'queries')) {
-                $this->cachedLogger->queries = [];
-            }
+            if (method_exists($this->cachedLogger, 'clearQueries')) { $this->cachedLogger->clearQueries(); }
+            elseif (property_exists($this->cachedLogger, 'queries')) { $this->cachedLogger->queries = []; }
         } else {
-            $config = $this->em->getConnection()->getConfiguration();
-            $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
+            $config = $this->em->getConnection()->getConfiguration(); $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
             if ($logger) {
-                if (method_exists($logger, 'clearQueries')) {
-                    $logger->clearQueries();
-                } elseif (property_exists($logger, 'queries')) {
-                    $logger->queries = [];
-                }
+                if (method_exists($logger, 'clearQueries')) { $logger->clearQueries(); }
+                elseif (property_exists($logger, 'queries')) { $logger->queries = []; }
             }
         }
     }
@@ -919,17 +653,11 @@ class GeonameImporter
         if ($this->io) $this->io->text("⬇️  Downloading: $url");
         if (!is_dir($this->tmpDir)) mkdir($this->tmpDir, 0777, true);
         $tempFile = $this->tmpDir . DIRECTORY_SEPARATOR . uniqid('geoname_', true);
-        
         $response = $this->httpClient->request('GET', $url);
-        if ($response->getStatusCode() !== 200) {
-            throw new \RuntimeException("Failed to download: " . $response->getStatusCode());
-        }
+        if ($response->getStatusCode() !== 200) { throw new \RuntimeException("Failed to download: " . $response->getStatusCode()); }
         $fileHandler = fopen($tempFile, 'w');
-        foreach ($this->httpClient->stream($response) as $chunk) {
-            fwrite($fileHandler, $chunk->getContent());
-        }
-        fclose($fileHandler);
-        return $tempFile;
+        foreach ($this->httpClient->stream($response) as $chunk) { fwrite($fileHandler, $chunk->getContent()); }
+        fclose($fileHandler); return $tempFile;
     }
 
     private function unzip(string $zipPath): string
@@ -937,13 +665,9 @@ class GeonameImporter
         if ($this->io) $this->io->text("📦 Decompressing file...");
         $zip = new \ZipArchive();
         if ($zip->open($zipPath) === true) {
-            $extractDir = $this->tmpDir . DIRECTORY_SEPARATOR . uniqid('extract_', true);
-            mkdir($extractDir);
-            $zip->extractTo($extractDir);
-            $zip->close();
-            unlink($zipPath);
-            $files = glob($extractDir . DIRECTORY_SEPARATOR . '*.txt');
-            return $files[0];
+            $extractDir = $this->tmpDir . DIRECTORY_SEPARATOR . uniqid('extract_', true); mkdir($extractDir);
+            $zip->extractTo($extractDir); $zip->close(); unlink($zipPath);
+            $files = glob($extractDir . DIRECTORY_SEPARATOR . '*.txt'); return $files[0];
         }
         throw new \RuntimeException('Failed to unzip file');
     }
@@ -951,310 +675,117 @@ class GeonameImporter
     private function bulkInsert(string $entityClass, array $rows, int $chunkSize = 1000): int
     {
         if (empty($rows)) return 0;
-
-        $conn = $this->em->getConnection();
-        $metadata = $this->em->getClassMetadata($entityClass);
-        $tableName = $this->geonameTableName;
-        if (str_contains($entityClass, 'AlternateName')) {
-            $tableName = $this->alternateNameTableName;
-        }
-        
-        $columnMap = $this->getColumnMap($metadata);
-        $columns = array_values($columnMap);
-        
-        $platform = $conn->getDatabasePlatform();
-        $quotedColumns = array_map(fn($c) => $platform->quoteIdentifier($c), $columns);
-        $columnsSql = implode(', ', $quotedColumns);
-        $isMysql = str_contains(strtolower(get_class($platform)), 'mysql') || str_contains(strtolower(get_class($platform)), 'mariadb');
-
+        $conn = $this->em->getConnection(); $metadata = $this->em->getClassMetadata($entityClass);
+        $tableName = $this->geonameTableName; if (str_contains($entityClass, 'AlternateName')) { $tableName = $this->alternateNameTableName; }
+        $columnMap = $this->getColumnMap($metadata); $columns = array_values($columnMap);
+        $platform = $conn->getDatabasePlatform(); $quotedColumns = array_map(fn($c) => $platform->quoteIdentifier($c), $columns);
+        $columnsSql = implode(', ', $quotedColumns); $isMysql = str_contains(strtolower(get_class($platform)), 'mysql') || str_contains(strtolower(get_class($platform)), 'mariadb');
         $totalInserted = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
-            $placeholders = [];
-            $params = [];
-
+            $placeholders = []; $params = [];
             foreach ($chunk as $row) {
                 $rowPlaceholders = [];
                 foreach ($columnMap as $prop => $col) {
                     $val = $row[$prop] ?? null;
-                    if ($val instanceof \DateTimeInterface) {
-                        $val = $val->format('Y-m-d H:i:s');
-                    } elseif (is_bool($val)) {
-                        $val = $val ? 1 : 0;
-                    }
-                    $params[] = $val;
-                    $rowPlaceholders[] = '?';
+                    if ($val instanceof \DateTimeInterface) { $val = $val->format('Y-m-d H:i:s'); }
+                    elseif (is_bool($val)) { $val = $val ? 1 : 0; }
+                    $params[] = $val; $rowPlaceholders[] = '?';
                 }
                 $placeholders[] = '(' . implode(', ', $rowPlaceholders) . ')';
             }
-
-            $sql = sprintf(
-                'INSERT %s INTO %s (%s) VALUES %s',
-                $isMysql ? 'IGNORE' : '',
-                $platform->quoteIdentifier($tableName),
-                $columnsSql,
-                implode(', ', $placeholders)
-            );
-
-            if (!$isMysql && (str_contains(strtolower(get_class($platform)), 'postgresql') || str_contains(strtolower(get_class($platform)), 'sqlite'))) {
-                $sql .= ' ON CONFLICT DO NOTHING';
-            }
-
+            $sql = sprintf('INSERT %s INTO %s (%s) VALUES %s', $isMysql ? 'IGNORE' : '', $platform->quoteIdentifier($tableName), $columnsSql, implode(', ', $placeholders));
+            if (!$isMysql && (str_contains(strtolower(get_class($platform)), 'postgresql') || str_contains(strtolower(get_class($platform)), 'sqlite'))) { $sql .= ' ON CONFLICT DO NOTHING'; }
             $totalInserted += $this->executeInternal($sql, $params);
-
-            unset($params);
-            unset($placeholders);
         }
-
         return $totalInserted;
     }
 
     private function bulkUpdate(string $entityClass, array $rows, string $pkField = 'id', int $chunkSize = 1000): int
     {
         if (empty($rows)) return 0;
-
-        $conn = $this->em->getConnection();
-        $metadata = $this->em->getClassMetadata($entityClass);
-        $tableName = $this->geonameTableName;
-        if (str_contains($entityClass, 'AlternateName')) {
-            $tableName = $this->alternateNameTableName;
-        }
-
-        $columnMap = $this->getColumnMap($metadata);
-        $pkColumn = $columnMap[$pkField];
-
-        $platform = $conn->getDatabasePlatform();
-        $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
-
+        $conn = $this->em->getConnection(); $metadata = $this->em->getClassMetadata($entityClass);
+        $tableName = $this->geonameTableName; if (str_contains($entityClass, 'AlternateName')) { $tableName = $this->alternateNameTableName; }
+        $columnMap = $this->getColumnMap($metadata); $pkColumn = $columnMap[$pkField];
+        $platform = $conn->getDatabasePlatform(); $pkColumnQuoted = $platform->quoteIdentifier($pkColumn);
         $totalUpdated = 0;
         foreach (array_chunk($rows, $chunkSize) as $chunk) {
-            $firstRowKeys = array_keys(reset($chunk));
-            $presentProps = [];
-            foreach ($firstRowKeys as $prop) {
-                if ($prop !== $pkField && isset($columnMap[$prop])) {
-                    $presentProps[$prop] = $columnMap[$prop];
-                }
-            }
-
+            $firstRowKeys = array_keys(reset($chunk)); $presentProps = [];
+            foreach ($firstRowKeys as $prop) { if ($prop !== $pkField && isset($columnMap[$prop])) { $presentProps[$prop] = $columnMap[$prop]; } }
             if (empty($presentProps)) continue;
-
-            $params = [];
-            $setClauses = [];
-            $pkValues = [];
-
-            foreach ($presentProps as $prop => $col) {
-                $colQuoted = $platform->quoteIdentifier($col);
-                $setClauses[$col] = "$colQuoted = CASE $pkColumnQuoted ";
-            }
-
+            $params = []; $setClauses = []; $pkValues = [];
+            foreach ($presentProps as $prop => $col) { $colQuoted = $platform->quoteIdentifier($col); $setClauses[$col] = "$colQuoted = CASE $pkColumnQuoted "; }
             foreach ($chunk as $row) {
-                if (array_keys($row) !== $firstRowKeys) {
-                    throw new \InvalidArgumentException("Inconsistent data structure in bulkUpdate batch.");
-                }
-
-                $pkVal = $row[$pkField] ?? null;
-                if ($pkVal === null) continue;
-                $pkValues[] = $pkVal;
-
-                foreach ($presentProps as $prop => $col) {
-                    $setClauses[$col] .= "WHEN ? THEN ? ";
-                }
+                if (array_keys($row) !== $firstRowKeys) { throw new \InvalidArgumentException("Inconsistent data structure in bulkUpdate batch."); }
+                $pkVal = $row[$pkField] ?? null; if ($pkVal === null) continue; $pkValues[] = $pkVal;
+                foreach ($presentProps as $prop => $col) { $setClauses[$col] .= "WHEN ? THEN ? "; }
             }
-
             if (empty($pkValues)) continue;
-
             $sqlParams = [];
             foreach ($presentProps as $prop => $col) {
-                foreach ($chunk as $row) {
-                    $sqlParams[] = $row[$pkField];
-                    $val = $row[$prop] ?? null;
-                    if ($val instanceof \DateTimeInterface) {
-                        $val = $val->format('Y-m-d H:i:s');
-                    } elseif (is_bool($val)) {
-                        $val = $val ? 1 : 0;
-                    }
-                    $sqlParams[] = $val;
-                }
+                foreach ($chunk as $row) { $sqlParams[] = $row[$pkField]; $val = $row[$prop] ?? null; if ($val instanceof \DateTimeInterface) { $val = $val->format('Y-m-d H:i:s'); } elseif (is_bool($val)) { $val = $val ? 1 : 0; } $sqlParams[] = $val; }
             }
-            foreach ($pkValues as $pk) {
-                $sqlParams[] = $pk;
-            }
-
-            $sqlSet = [];
-            foreach ($setClauses as $col => $clause) {
-                $sqlSet[] = $clause . " END";
-            }
-
-            $sql = sprintf(
-                "UPDATE %s SET %s WHERE %s IN (%s)",
-                $platform->quoteIdentifier($tableName),
-                implode(', ', $sqlSet),
-                $pkColumnQuoted,
-                implode(', ', array_fill(0, count($pkValues), '?'))
-            );
-
+            foreach ($pkValues as $pk) { $sqlParams[] = $pk; }
+            $sqlSet = []; foreach ($setClauses as $col => $clause) { $sqlSet[] = $clause . " END"; }
+            $sql = sprintf("UPDATE %s SET %s WHERE %s IN (%s)", $platform->quoteIdentifier($tableName), implode(', ', $sqlSet), $pkColumnQuoted, implode(', ', array_fill(0, count($pkValues), '?')));
             $totalUpdated += $this->executeInternal($sql, $sqlParams);
-
-            unset($sqlParams);
-            unset($pkValues);
-            unset($setClauses);
-            unset($sqlSet);
             gc_collect_cycles();
         }
-
         return $totalUpdated;
     }
 
     private function getColumnMap(ClassMetadata $metadata): array
     {
-        $map = [];
-        foreach ($metadata->getFieldNames() as $fieldName) {
-            $map[$fieldName] = $metadata->getColumnName($fieldName);
-        }
+        $map = []; foreach ($metadata->getFieldNames() as $fieldName) { $map[$fieldName] = $metadata->getColumnName($fieldName); }
         return $map;
     }
 
     private function findExistingIds(string $entityClass, array $ids): array
     {
-        $conn = $this->em->getConnection();
-        $platform = $conn->getDatabasePlatform();
-        
-        $tableName = $this->geonameTableName;
-        if (str_contains($entityClass, 'AlternateName')) {
-            $tableName = $this->alternateNameTableName;
-        }
-
-        $metadata = $this->em->getClassMetadata($entityClass);
-        $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
-
+        $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform();
+        $tableName = $this->geonameTableName; if (str_contains($entityClass, 'AlternateName')) { $tableName = $this->alternateNameTableName; }
+        $metadata = $this->em->getClassMetadata($entityClass); $pkColumn = $metadata->getColumnName($metadata->getIdentifierFieldNames()[0]);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (%s)", 
-            $platform->quoteIdentifier($pkColumn), 
-            $platform->quoteIdentifier($tableName), 
-            $platform->quoteIdentifier($pkColumn),
-            $placeholders
-        );
-        
-        $found = $this->fetchAllInternal($sql, $ids);
-
-        return array_map('intval', $found);
+        $sql = sprintf("SELECT %s FROM %s WHERE %s IN (%s)", $platform->quoteIdentifier($pkColumn), $platform->quoteIdentifier($tableName), $platform->quoteIdentifier($pkColumn), $placeholders);
+        $found = $this->fetchAllInternal($sql, $ids); return array_map('intval', $found);
     }
 
     private function executeInternal(string $sql, array $params): int
     {
         $conn = $this->em->getConnection();
-        if ($this->debug) {
-            $pdo = $conn->getNativeConnection();
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            return $stmt->rowCount();
-        }
+        if ($this->debug) { $pdo = $conn->getNativeConnection(); $stmt = $pdo->prepare($sql); $stmt->execute($params); return $stmt->rowCount(); }
         return $conn->executeStatement($sql, $params);
     }
 
     private function fetchAllInternal(string $sql, array $params): array
     {
         $conn = $this->em->getConnection();
-        if ($this->debug) {
-            $pdo = $conn->getNativeConnection();
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            return $stmt->fetchAll(\PDO::FETCH_COLUMN);
-        }
+        if ($this->debug) { $pdo = $conn->getNativeConnection(); $stmt = $pdo->prepare($sql); $stmt->execute($params); return $stmt->fetchAll(\PDO::FETCH_COLUMN); }
         return $conn->executeQuery($sql, $params)->fetchFirstColumn();
     }
 
     private function takeMemorySnapshot(string $label, array $localVars = []): void
     {
-        $snapshot = [
-            'total' => memory_get_usage(true),
-            'properties' => [],
-            'locals' => [],
-            'globals' => []
-        ];
-
-        foreach (get_object_vars($this) as $name => $value) {
-            if ($name === 'memorySnapshots') continue;
-            $snapshot['properties'][$name] = $this->estimateSize($value);
-        }
-
-        foreach ($localVars as $name => $value) {
-            $snapshot['locals'][$name] = $this->estimateSize($value);
-        }
-
+        $snapshot = ['total' => memory_get_usage(true), 'properties' => [], 'locals' => [], 'globals' => []];
+        foreach (get_object_vars($this) as $name => $value) { if ($name === 'memorySnapshots') continue; $snapshot['properties'][$name] = $this->estimateSize($value); }
+        foreach ($localVars as $name => $value) { $snapshot['locals'][$name] = $this->estimateSize($value); }
         $skipGlobals = ['GLOBALS', '_SERVER', '_ENV', 'memorySnapshots', 'composerLoader', 'argv', 'argc'];
-        foreach ($GLOBALS as $name => $value) {
-            if (in_array($name, $skipGlobals, true)) continue;
-            if ($value === $this) continue;
-            
-            $size = $this->estimateSize($value);
-            if ($size > 1024) {
-                $snapshot['globals'][$name] = $size;
-            }
-        }
-        
+        foreach ($GLOBALS as $name => $value) { if (in_array($name, $skipGlobals, true)) continue; if ($value === $this) continue; $size = $this->estimateSize($value); if ($size > 1024) { $snapshot['globals'][$name] = $size; } }
         $this->memorySnapshots[$label] = $snapshot;
-
-        if (count($this->memorySnapshots) > 5) {
-            $keys = array_keys($this->memorySnapshots);
-            foreach ($keys as $key) {
-                if ($key !== 'START' && $key !== $label && $key !== end($keys)) {
-                    unset($this->memorySnapshots[$key]);
-                    if (count($this->memorySnapshots) <= 5) break;
-                }
-            }
-        }
+        if (count($this->memorySnapshots) > 5) { $keys = array_keys($this->memorySnapshots); foreach ($keys as $key) { if ($key !== 'START' && $key !== $label && $key !== end($keys)) { unset($this->memorySnapshots[$key]); if (count($this->memorySnapshots) <= 5) break; } } }
     }
 
     private function compareMemorySnapshots(string $label1, string $label2): void
     {
         if (!isset($this->memorySnapshots[$label1], $this->memorySnapshots[$label2])) return;
-
-        $s1 = $this->memorySnapshots[$label1];
-        $s2 = $this->memorySnapshots[$label2];
-
-        $this->io->newLine();
-        $this->io->writeln(sprintf("<comment>Memory Comparison [%s vs %s]</comment>", $label1, $label2));
-        $diffTotal = ($s2['total'] - $s1['total']) / 1024 / 1024;
-        $this->io->writeln(sprintf("├─ Total RAM Change: <info>%+.2f MB</info>", $diffTotal));
-
-        foreach ($s2['properties'] as $name => $size2) {
-            $size1 = $s1['properties'][$name] ?? 0;
-            if ($size2 > $size1) {
-                $diff = ($size2 - $size1) / 1024;
-                $this->io->writeln(sprintf("├─ Property <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
-            }
-        }
-
-        foreach ($s2['locals'] as $name => $size2) {
-            $size1 = $s1['locals'][$name] ?? 0;
-            if ($size2 > $size1) {
-                $diff = ($size2 - $size1) / 1024;
-                $this->io->writeln(sprintf("├─ Local Var <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
-            }
-        }
-
-        foreach ($s2['globals'] as $name => $size2) {
-            $size1 = $s1['globals'][$name] ?? 0;
-            if ($size2 > $size1) {
-                $diff = ($size2 - $size1) / 1024;
-                $this->io->writeln(sprintf("├─ External/Global <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff));
-            }
-        }
-        
-        if (abs($diffTotal) > 1 && empty($s2['globals'] ?? []) && empty($s2['properties'] ?? [])) {
-            $this->io->writeln("├─ <error>WARNING:</error> RAM grew significantly but no variable growth detected.");
-            $this->io->writeln("│  This indicates hidden internal PHP buffers or native extension leaks.");
-        }
+        $s1 = $this->memorySnapshots[$label1]; $s2 = $this->memorySnapshots[$label2];
+        $this->io->newLine(); $this->io->writeln(sprintf("<comment>Memory Comparison [%s vs %s]</comment>", $label1, $label2));
+        $diffTotal = ($s2['total'] - $s1['total']) / 1024 / 1024; $this->io->writeln(sprintf("├─ Total RAM Change: <info>%+.2f MB</info>", $diffTotal));
+        foreach ($s2['properties'] as $name => $size2) { $size1 = $s1['properties'][$name] ?? 0; if ($size2 > $size1) { $diff = ($size2 - $size1) / 1024; $this->io->writeln(sprintf("├─ Property <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff)); } }
+        foreach ($s2['locals'] as $name => $size2) { $size1 = $s1['locals'][$name] ?? 0; if ($size2 > $size1) { $diff = ($size2 - $size1) / 1024; $this->io->writeln(sprintf("├─ Local Var <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff)); } }
+        foreach ($s2['globals'] as $name => $size2) { $size1 = $s1['globals'][$name] ?? 0; if ($size2 > $size1) { $diff = ($size2 - $size1) / 1024; $this->io->writeln(sprintf("├─ External/Global <info>%s</info> grew by <error>%.2f KB</error>", $name, $diff)); } }
+        if (abs($diffTotal) > 1 && empty($s2['globals'] ?? []) && empty($s2['properties'] ?? [])) { $this->io->writeln("├─ <error>WARNING:</error> RAM grew significantly but no variable growth detected."); $this->io->writeln("│  This indicates hidden internal PHP buffers or native extension leaks."); }
         $this->io->newLine();
     }
 
-    private function estimateSize($var): int
-    {
-        try {
-            if (is_resource($var)) return 0;
-            return strlen(@serialize($var));
-        } catch (\Throwable $e) {
-            return 0;
-        }
-    }
+    private function estimateSize($var): int { try { if (is_resource($var)) return 0; return strlen(@serialize($var)); } catch (\Throwable $e) { return 0; } }
 }
