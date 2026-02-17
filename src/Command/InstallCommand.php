@@ -138,7 +138,7 @@ class InstallCommand extends Command
         $this->fulltextRequested = $this->confirm($io, 'Enable Full-Text search? (Adds indexes to DB and enables advanced search features)', true);
         $fulltextString = $this->fulltextRequested ? 'true' : 'false';
 
-        $enableAdmin5 = $this->confirm($io, 'Enable Admin5 support?', false);
+        $enableAdmin5 = $this->confirm($io, 'Enable Admin5 support? (Sub-municipal divisions, used in countries like FR, BE, ES, MX)', false);
         $admin5String = $enableAdmin5 ? 'true' : 'false';
 
         $namespace = rtrim($namespace, '\\');
