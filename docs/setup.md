@@ -67,6 +67,8 @@ Repeat this for all 11 required entities (Country, Language, Import, Admin1-5, A
 
 If you enabled Full-Text search, the installer adds special indexes to your database. If you skipped this step, you can run it later by relaunching the installer.
 
+> **Note on Admin5**: Support for Admin5 is disabled by default as it is only used in a few countries (like Nepal, Dominican Republic, Germany, France, Italy, or Uganda) for very granular subdivisions. If you need it, make sure to enable it in your configuration and run the Admin5 import.
+
 **Database Support**:
 - **MySQL/MariaDB**: Uses `FULLTEXT` indexes.
 - **PostgreSQL**: Uses `GIN` indexes with `to_tsvector`.

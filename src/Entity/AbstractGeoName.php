@@ -6,7 +6,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\MappedSuperclass]
-#[ORM\Index(columns: ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'], name: 'idx_admin_hierarchy')]
+#[ORM\Index(columns: ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'], name: 'idx_admin_hierarchy')]
 #[ORM\Index(columns: ['name'], name: 'idx_name')]
 #[ORM\Index(columns: ['ascii_name'], name: 'idx_ascii_name')]
 #[ORM\Index(columns: ['population'], name: 'idx_population')]

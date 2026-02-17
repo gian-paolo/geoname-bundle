@@ -330,6 +330,7 @@ class GeonameSearchService
             elseif ($fCode === 'ADM2') { $parentCodes['admin1_code'] = $parent['admin1_code']; $parentCodes['admin2_code'] = $parent['admin2_code']; }
             elseif ($fCode === 'ADM3') { $parentCodes['admin1_code'] = $parent['admin1_code']; $parentCodes['admin2_code'] = $parent['admin2_code']; $parentCodes['admin3_code'] = $parent['admin3_code']; }
             elseif ($fCode === 'ADM4') { $parentCodes['admin1_code'] = $parent['admin1_code']; $parentCodes['admin2_code'] = $parent['admin2_code']; $parentCodes['admin3_code'] = $parent['admin3_code']; $parentCodes['admin4_code'] = $parent['admin4_code']; }
+            elseif ($fCode === 'ADM5') { $parentCodes['admin1_code'] = $parent['admin1_code']; $parentCodes['admin2_code'] = $parent['admin2_code']; $parentCodes['admin3_code'] = $parent['admin3_code']; $parentCodes['admin4_code'] = $parent['admin4_code']; $parentCodes['admin5_code'] = $parent['admin5_code']; }
         }
 
         return $this->getChildren($parent['country_code'], $parentCodes, $options);

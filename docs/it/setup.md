@@ -67,6 +67,8 @@ Ripeti questa operazione per tutte le 11 entità richieste (Country, Language, I
 
 Se hai abilitato la ricerca Full-Text, l'installatore aggiunge indici speciali al tuo database. Se hai saltato questo passaggio, puoi eseguirlo in seguito rilanciando l'installatore.
 
+> **Nota su Admin5**: Il supporto per Admin5 è disabilitato di default poiché è utilizzato solo in pochi paesi (come Nepal, Repubblica Dominicana, Germania, Francia, Italia o Uganda) per suddivisioni molto capillari. Se ne hai bisogno, abilitalo nella configurazione ed esegui l'importazione specifica per Admin5.
+
 **Supporto Database**:
 - **MySQL/MariaDB**: Utilizza indici `FULLTEXT`.
 - **PostgreSQL**: Utilizza indici `GIN` con `to_tsvector`.

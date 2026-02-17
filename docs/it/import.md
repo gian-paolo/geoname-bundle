@@ -48,3 +48,19 @@ Ogni sessione di sincronizzazione viene registrata nella tabella `geo_import`. P
 - `status`: `running`, `completed` o `failed`.
 - `records_processed`: Numero totale di elementi aggiornati o inseriti.
 - `error_message`: In caso di errore, contiene lo stack trace o l'errore SQL.
+
+---
+
+## 🗺️ Mappatura Livelli Amministrativi
+
+GeoNames organizza i dati in 5 livelli amministrativi (da Admin1 a Admin5). Il significato di questi livelli varia drasticamente da paese a paese. Ecco alcuni esempi di paesi che utilizzano livelli granulari:
+
+| Paese | Admin1 (ADM1) | Admin2 (ADM2) | Admin3 (ADM3) | Admin4 (ADM4) | Admin5 (ADM5) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Italia (IT)** | Regioni | Province | Comuni | - | Municipi/Zone |
+| **Nepal (NP)** | Province | Distretti | Municipalità | Ward | Sotto-Ward |
+| **Rep. Dom. (DO)** | Regioni | Province | Comuni | Distretti Munic. | Quartieri |
+| **Francia (FR)** | Regioni | Dipartimenti | Arrondissement | Comuni | Cantoni |
+| **Germania (DE)** | Stati (Länder) | Distretti Amm. | Circondari (Kreise) | Comuni | - |
+| **USA (US)** | Stati | Contee | - | - | - |
+| **Uganda (UG)** | Regioni | Distretti | Contee | Sotto-contee | Parrocchie |
