@@ -6,20 +6,34 @@ class GeonameParser
 {
     /**
      * @param string $filePath
-     * @param int $batchSize
-     * @return \Generator<array<int, array>>
+     * @return \Generator<int, array>
      */
-    public function getBatches(string $filePath, int $batchSize = 1000): \Generator
+    public function getRows(string $filePath): \Generator
     {
         $handle = fopen($filePath, 'r');
         if (!$handle) {
             throw new \RuntimeException(sprintf('Could not open file: %s', $filePath));
         }
 
+        try {
+            while (($line = fgets($handle)) !== false) {
+                yield explode("\t", rtrim($line, "\r\n"));
+            }
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    /**
+     * @param string $filePath
+     * @param int $batchSize
+     * @return \Generator<int, array<int, array>>
+     */
+    public function getBatches(string $filePath, int $batchSize = 1000): \Generator
+    {
         $batch = [];
-        while (($line = fgets($handle)) !== false) {
-            $data = explode("\t", rtrim($line, "\r\n"));
-            $batch[] = $data;
+        foreach ($this->getRows($filePath) as $row) {
+            $batch[] = $row;
 
             if (count($batch) >= $batchSize) {
                 yield $batch;
@@ -34,7 +48,5 @@ class GeonameParser
         if (!empty($batch)) {
             yield $batch;
         }
-
-        fclose($handle);
     }
 }
