@@ -521,7 +521,11 @@ class GeonameImporter
 
     private function getColumnMap(ClassMetadata $metadata): array
     {
-        $map = []; foreach ($metadata->getFieldNames() as $f) $map[$p] = $metadata->getColumnName($f); return $map;
+        $map = [];
+        foreach ($metadata->getFieldNames() as $fieldName) {
+            $map[$fieldName] = $metadata->getColumnName($fieldName);
+        }
+        return $map;
     }
 
     private function findExistingIds(string $entityClass, array $ids): array
