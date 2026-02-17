@@ -66,9 +66,6 @@ class GeonameImporter
         $this->alternateNameTableName = $alternateNameTableName;
     }
 
-    /**
-     * Resets cumulative memory monitoring.
-     */
     public function resetMemoryMonitoring(): void
     {
         $this->memorySnapshots = [];
@@ -78,17 +75,12 @@ class GeonameImporter
     {
         $this->disableLogging();
         $importLog = $this->createImportLog('full_import', $url);
-        
         $tempFilesToCleanup = [];
         $tempDirsToCleanup = [];
 
         try {
-            $conn = $this->em->getConnection();
-            $platform = $conn->getDatabasePlatform();
-            if ($this->io) {
-                if (!isset($this->memorySnapshots['START'])) {
-                    $this->takeMemorySnapshot('START');
-                }
+            if ($this->io && !isset($this->memorySnapshots['START'])) {
+                $this->takeMemorySnapshot('START');
             }
 
             $filePath = $this->downloadFile($url);
@@ -114,8 +106,7 @@ class GeonameImporter
                 $totalModified += $results['modified'];
                 $totalSkipped += $results['skipped'];
 
-                $totalSaved = $totalInserted + $totalUpdated;
-                $this->updateImportLog($importLog, $totalSaved);
+                $this->updateImportLog($importLog, $totalInserted + $totalUpdated);
                 
                 if ($this->io) {
                     $elapsed = microtime(true) - $startTime;
@@ -149,48 +140,29 @@ class GeonameImporter
 
     public function importHierarchy(string $url): int
     {
-        $this->disableLogging();
-        $filePath = $this->downloadFile($url);
+        $this->disableLogging(); $filePath = $this->downloadFile($url);
         $tempDirsToCleanup = [];
-        if (str_ends_with($url, '.zip')) {
-            $result = $this->unzip($filePath);
-            $filePath = $result['file'];
-            $tempDirsToCleanup[] = $result['dir'];
-        }
-
+        if (str_ends_with($url, '.zip')) { $result = $this->unzip($filePath); $filePath = $result['file']; $tempDirsToCleanup[] = $result['dir']; }
         $total = 0; $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform();
         foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
             $values = []; $placeholders = [];
             foreach ($batch as $row) {
                 if (count($row) < 2) continue;
-                $placeholders[] = '(?, ?, ?)';
-                $values[] = (int)$row[0]; $values[] = (int)$row[1]; $values[] = $row[2] ?? null;
-                $total++;
+                $placeholders[] = '(?, ?, ?)'; $values[] = (int)$row[0]; $values[] = (int)$row[1]; $values[] = $row[2] ?? null; $total++;
             }
-            if (empty($placeholders)) continue;
-            $this->executeInternal(sprintf("INSERT IGNORE INTO %s (parentid, childid, type) VALUES %s", $platform->quoteIdentifier($this->hierarchyTableName), implode(', ', $placeholders)), $values);
+            if (!empty($placeholders)) $this->executeInternal(sprintf("INSERT IGNORE INTO %s (parentid, childid, type) VALUES %s", $platform->quoteIdentifier($this->hierarchyTableName), implode(', ', $placeholders)), $values);
             unset($batch, $values, $placeholders);
         }
-        @unlink($filePath);
-        foreach ($tempDirsToCleanup as $d) { $this->fs->remove($d); }
+        @unlink($filePath); foreach ($tempDirsToCleanup as $d) { $this->fs->remove($d); }
         return $total;
     }
 
     public function importAlternateNames(string $url, ?array $allowedLanguages = null): void
     {
-        $filePath = $this->downloadFile($url);
-        $tempDirsToCleanup = [];
-        if (str_ends_with($url, '.zip')) {
-            $result = $this->unzip($filePath);
-            $filePath = $result['file'];
-            $tempDirsToCleanup[] = $result['dir'];
-        }
-        foreach ($this->parser->getBatches($filePath, 1000) as $batch) {
-            $this->processAlternateNameBatch($batch, $allowedLanguages);
-            unset($batch);
-        }
-        @unlink($filePath);
-        foreach ($tempDirsToCleanup as $d) { $this->fs->remove($d); }
+        $filePath = $this->downloadFile($url); $tempDirsToCleanup = [];
+        if (str_ends_with($url, '.zip')) { $result = $this->unzip($filePath); $filePath = $result['file']; $tempDirsToCleanup[] = $result['dir']; }
+        foreach ($this->parser->getBatches($filePath, 1000) as $batch) { $this->processAlternateNameBatch($batch, $allowedLanguages); unset($batch); }
+        @unlink($filePath); foreach ($tempDirsToCleanup as $d) { $this->fs->remove($d); }
     }
 
     private function processAlternateNameBatch(array $batch, ?array $allowedLanguages): int
@@ -198,14 +170,13 @@ class GeonameImporter
         $ids = []; $dataToProcess = [];
         foreach ($batch as $row) {
             if (count($row) < 4) continue;
-            $lang = $row[2] ?? '';
-            if ($allowedLanguages && !empty($allowedLanguages) && !in_array($lang, $allowedLanguages)) continue;
+            $lang = $row[2] ?? ''; if ($allowedLanguages && !empty($allowedLanguages) && !in_array($lang, $allowedLanguages)) continue;
             $id = (int)$row[0]; $ids[] = $id;
             $dataToProcess[$id] = [ 'id' => $id, 'geonameId' => (int)$row[1], 'isoLanguage' => mb_substr((string)$lang, 0, 7), 'alternateName' => mb_substr((string)$row[3], 0, 200), 'isPreferredName' => ($row[4] ?? '') === '1', 'isShortName' => ($row[5] ?? '') === '1', 'isColloquial' => ($row[6] ?? '') === '1', 'isHistoric' => ($row[7] ?? '') === '1' ];
         }
         if (empty($ids)) return 0;
         $existingIds = $this->findExistingIds($this->alternateNameEntityClass, $ids);
-        $toUpdate = []; $toInsert = [];
+        $existingIds = array_map('intval', $existingIds); $toUpdate = []; $toInsert = [];
         foreach ($dataToProcess as $id => $data) { if (in_array($id, $existingIds)) { $toUpdate[] = $data; } else { $toInsert[] = $data; } }
         $count = 0;
         if (!empty($toInsert)) $count += $this->bulkInsert($this->alternateNameEntityClass, $toInsert);
@@ -232,7 +203,8 @@ class GeonameImporter
         $tableName = null; $level = null;
         if (str_contains($url, 'admin1Codes')) { $tableName = $this->adminTableNames['adm1'] ?? null; $level = 1; }
         elseif (str_contains($url, 'admin2Codes')) { $tableName = $this->adminTableNames['adm2'] ?? null; $level = 2; }
-        if (!$tableName) { $tableName = $this->em->getClassMetadata($entityClass)->getTableName(); }
+        if (!$tableName) $tableName = $this->em->getClassMetadata($entityClass)->getTableName();
+
         foreach ($this->parser->getBatches($filePath, 500) as $batch) {
             $values = []; $placeholders = [];
             foreach ($batch as $row) {
@@ -242,7 +214,21 @@ class GeonameImporter
                 if ($level === 1 && count($codeParts) === 2) { $placeholders[] = '(?, ?, ?, ?, ?)'; $values[] = $codeParts[0]; $values[] = $codeParts[1]; $values[] = mb_substr((string)$row[1], 0, 200); $values[] = mb_substr((string)$row[2], 0, 200); $values[] = (int)$row[3]; $total++; }
                 elseif ($level === 2 && count($codeParts) === 3) { $placeholders[] = '(?, ?, ?, ?, ?, ?)'; $values[] = $codeParts[0]; $values[] = $codeParts[1]; $values[] = $codeParts[2]; $values[] = mb_substr((string)$row[1], 0, 200); $values[] = mb_substr((string)$row[2], 0, 200); $values[] = (int)$row[3]; $total++; }
             }
-            if (!empty($placeholders)) { $this->executeInternal(sprintf("INSERT INTO %s (%s, %s, %s, %s) VALUES %s ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)", $platform->quoteIdentifier($tableName), implode(', ', ($level === 1) ? ['country_code', 'admin1_code'] : ['country_code', 'admin1_code', 'admin2_code']), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'), implode(', ', $placeholders), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')), $values); }
+            if (!empty($placeholders)) {
+                $colsArr = ($level === 1) ? ['country_code', 'admin1_code'] : ['country_code', 'admin1_code', 'admin2_code'];
+                $colsList = implode(', ', array_map(fn($c) => $platform->quoteIdentifier($c), $colsArr));
+                $sqlTableName = $platform->quoteIdentifier($tableName);
+                $nameCol = $platform->quoteIdentifier('name'); $asciiCol = $platform->quoteIdentifier('ascii_name'); $gidCol = $platform->quoteIdentifier('geonameid');
+
+                if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
+                    $sql = sprintf("INSERT INTO %s (%s, %s, %s, %s) VALUES %s ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)",
+                        $sqlTableName, $colsList, $nameCol, $asciiCol, $gidCol, implode(', ', $placeholders), $nameCol, $nameCol, $asciiCol, $asciiCol, $gidCol, $gidCol);
+                } else {
+                    $sql = sprintf("INSERT INTO %s (%s, %s, %s, %s) VALUES %s ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s, %s = EXCLUDED.%s",
+                        $sqlTableName, $colsList, $nameCol, $asciiCol, $gidCol, implode(', ', $placeholders), $colsList, $nameCol, $nameCol, $asciiCol, $asciiCol, $gidCol, $gidCol);
+                }
+                $this->executeInternal($sql, $values);
+            }
             unset($batch, $values, $placeholders);
         }
         @unlink($filePath); return $total;
@@ -261,32 +247,36 @@ class GeonameImporter
         $levels = ['ADM1', 'ADM2', 'ADM3', 'ADM4', 'ADM5']; $stats = []; $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform(); $platformClass = strtolower(get_class($platform));
         foreach ($levels as $level) {
             $targetTable = $this->adminTableNames[strtolower($level)] ?? null; if (!$targetTable) continue;
-            $where = ["g.feature_code = " . $conn->quote($level)]; if (!empty($allowedCountries)) { $where[] = "g.country_code IN (" . implode(',', array_map([$conn, 'quote'], $allowedCountries)) . ")"; }
+            $where = ["g.feature_code = " . $conn->quote($level)]; if (!empty($allowedCountries)) $where[] = "g.country_code IN (" . implode(',', array_map([$conn, 'quote'], $allowedCountries)) . ")";
             $whereSql = implode(' AND ', $where);
             $cols = match ($level) { 'ADM1' => ['country_code', 'admin1_code'], 'ADM2' => ['country_code', 'admin1_code', 'admin2_code'], 'ADM3' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code'], 'ADM4' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'], 'ADM5' => ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'] };
             $colsQuoted = array_map(fn($c) => $platform->quoteIdentifier($c), $cols); $colsList = implode(', ', $colsQuoted); $targetTableQuoted = $platform->quoteIdentifier($targetTable); $importTableQuoted = $platform->quoteIdentifier($this->geonameTableName);
-            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) { $this->executeInternal(sprintf("INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid) SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g WHERE %s", $targetTableQuoted, $colsList, implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)), $importTableQuoted, $whereSql), []); }
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
+                $this->executeInternal(sprintf("INSERT IGNORE INTO %s (%s, name, ascii_name, geonameid) SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g WHERE %s", $targetTableQuoted, $colsList, implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)), $importTableQuoted, $whereSql), []);
+            } else {
+                $this->executeInternal(sprintf("INSERT INTO %s (%s, name, ascii_name, geonameid) SELECT DISTINCT %s, g.name, g.ascii_name, g.geonameid FROM %s g WHERE %s ON CONFLICT (%s) DO NOTHING", $targetTableQuoted, $colsList, implode(', ', array_map(fn($c) => "g." . $platform->quoteIdentifier($c), $cols)), $importTableQuoted, $whereSql, $colsList), []);
+            }
             $joinOn = implode(' AND ', array_map(fn($c) => "t." . $platform->quoteIdentifier($c) . " = g." . $platform->quoteIdentifier($c), $cols));
-            $this->executeInternal(sprintf("UPDATE %s t INNER JOIN %s g ON %s SET t.name = g.name, t.ascii_name = g.ascii_name, t.geonameid = g.geonameid WHERE %s", $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql), []);
-            $stats[$level] = 0; // Stats are less important than speed here
+            if (str_contains($platformClass, 'postgresql')) { $this->executeInternal(sprintf("UPDATE %s t SET name = g.name, ascii_name = g.ascii_name, geonameid = g.geonameid FROM %s g WHERE %s AND %s", $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql), []); }
+            else { $this->executeInternal(sprintf("UPDATE %s t INNER JOIN %s g ON %s SET t.name = g.name, t.ascii_name = g.ascii_name, t.geonameid = g.geonameid WHERE %s", $targetTableQuoted, $importTableQuoted, $joinOn, $whereSql), []); }
+            $stats[$level] = 0;
         }
         return $stats;
     }
 
     public function importAdmin5(string $url, string $tableName): int
     {
-        $this->disableLogging(); $filePath = $this->downloadFile($url);
-        $tempDirsToCleanup = [];
+        $this->disableLogging(); $filePath = $this->downloadFile($url); $tempDirsToCleanup = [];
         if (str_ends_with($url, '.zip')) { $result = $this->unzip($filePath); $filePath = $result['file']; $tempDirsToCleanup[] = $result['dir']; }
         $total = 0; $conn = $this->em->getConnection(); $platform = $conn->getDatabasePlatform();
         foreach ($this->parser->getBatches($filePath, 2000) as $batch) {
             $sql = sprintf("UPDATE %s SET admin5_code = CASE geonameid ", $platform->quoteIdentifier($tableName));
             $ids = []; $values = [];
             foreach ($batch as $row) { if (count($row) < 2) continue; $id = (int)$row[0]; $code = $row[1]; $sql .= "WHEN ? THEN ? "; $values[] = $id; $values[] = $code; $ids[] = $id; $total++; }
-            if (!empty($ids)) { $this->executeInternal($sql . "END WHERE geonameid IN (" . implode(',', array_fill(0, count($ids), '?')) . ")", array_merge($values, $ids)); }
+            if (!empty($ids)) $this->executeInternal($sql . "END WHERE geonameid IN (" . implode(',', array_fill(0, count($ids), '?')) . ")", array_merge($values, $ids));
             unset($batch, $ids, $values);
         }
-        @unlink($filePath); foreach ($tempDirsToCleanup as $d) { $this->fs->remove($d); }
+        @unlink($filePath); foreach ($tempDirsToCleanup as $d) $this->fs->remove($d);
         return $total;
     }
 
@@ -298,13 +288,13 @@ class GeonameImporter
             if (str_ends_with($url, '.zip')) { $result = $this->unzip($filePath); $filePath = $result['file']; $tempDirsToCleanup[] = $result['dir']; }
             $totalProcessed = 0;
             foreach ($this->parser->getBatches($filePath, 500) as $batch) {
-                if ($isAlternate) { if ($isDelete) { $totalProcessed += $this->processAlternateDeleteBatch($batch); } else { $totalProcessed += $this->processAlternateNameBatch($batch, null); } }
-                else { if ($isDelete) { $totalProcessed += $this->processDeleteBatch($batch); } else { $results = $this->processHybridBatch($batch, $allowedCountries); $totalProcessed += ($results['inserted'] + $results['updated']); } }
+                if ($isAlternate) { if ($isDelete) $totalProcessed += $this->processAlternateDeleteBatch($batch); else $totalProcessed += $this->processAlternateNameBatch($batch, null); }
+                else { if ($isDelete) $totalProcessed += $this->processDeleteBatch($batch); else { $results = $this->processHybridBatch($batch, $allowedCountries); $totalProcessed += ($results['inserted'] + $results['updated']); } }
                 $this->updateImportLog($importLog, $totalProcessed); unset($batch);
             }
             $this->completeImportLog($importLog, $totalProcessed); @unlink($filePath);
         } catch (\Throwable $e) { $this->failImportLog($importLog, $e->getMessage()); }
-        finally { foreach ($tempDirsToCleanup as $d) { $this->fs->remove($d); } }
+        finally { foreach ($tempDirsToCleanup as $d) $this->fs->remove($d); }
     }
 
     private function processHybridBatch(array $batch, ?array $allowedCountries): array
@@ -319,7 +309,7 @@ class GeonameImporter
         if (empty($ids)) return ['inserted' => 0, 'updated' => 0, 'modified' => 0, 'skipped' => $skipped];
         $existingIds = $this->findExistingIds($this->geonameEntityClass, $ids);
         $existingIds = array_map('intval', $existingIds); $toUpdate = []; $toInsert = [];
-        foreach ($toProcess as $id => $data) { if (in_array($id, $existingIds, true)) { $toUpdate[] = $data; } else { $toInsert[] = $data; } }
+        foreach ($toProcess as $id => $data) { if (in_array($id, $existingIds, true)) $toUpdate[] = $data; else $toInsert[] = $data; }
         $insertedCount = count($toInsert); $updatedCount = count($toUpdate); $actualModified = 0;
         if (!empty($toInsert)) $this->bulkInsert($this->geonameEntityClass, $toInsert);
         if (!empty($toUpdate)) $actualModified = $this->bulkUpdate($this->geonameEntityClass, $toUpdate, 'id');
@@ -350,9 +340,23 @@ class GeonameImporter
         foreach ($adminData as $level => $rows) {
             $tableName = $this->adminTableNames[strtolower($level)] ?? null; if (!$tableName || empty($rows)) continue;
             $firstRow = reset($rows); $cols = array_keys($firstRow); $placeholders = []; $values = []; $qs = '(' . implode(', ', array_fill(0, count($cols), '?')) . ')';
-            foreach ($rows as $row) { $placeholders[] = $qs; foreach ($cols as $col) { $values[] = $row[$col]; } }
-            $this->executeInternal(sprintf("INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)", $platform->quoteIdentifier($tableName), implode(', ', array_map(fn($c) => $platform->quoteIdentifier($c), $cols)), implode(', ', $placeholders), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('ascii_name'), $platform->quoteIdentifier('geonameid'), $platform->quoteIdentifier('geonameid')), $values);
-            unset($rows, $placeholders, $values);
+            foreach ($rows as $row) { $placeholders[] = $qs; foreach ($cols as $col) $values[] = $row[$col]; }
+            $colsList = implode(', ', array_map(fn($c) => $platform->quoteIdentifier($c), $cols));
+            $sqlTableName = $platform->quoteIdentifier($tableName);
+            $nameCol = $platform->quoteIdentifier('name'); $asciiCol = $platform->quoteIdentifier('ascii_name'); $gidCol = $platform->quoteIdentifier('geonameid');
+            if (str_contains($platformClass, 'mysql') || str_contains($platformClass, 'mariadb')) {
+                $sql = sprintf("INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s = VALUES(%s), %s = VALUES(%s), %s = VALUES(%s)", $sqlTableName, $colsList, implode(', ', $placeholders), $nameCol, $nameCol, $asciiCol, $asciiCol, $gidCol, $gidCol);
+            } else {
+                $pkCols = [];
+                if (str_contains($tableName, 'admin1')) $pkCols = ['country_code', 'admin1_code'];
+                elseif (str_contains($tableName, 'admin2')) $pkCols = ['country_code', 'admin1_code', 'admin2_code'];
+                elseif (str_contains($tableName, 'admin3')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code'];
+                elseif (str_contains($tableName, 'admin4')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code'];
+                elseif (str_contains($tableName, 'admin5')) $pkCols = ['country_code', 'admin1_code', 'admin2_code', 'admin3_code', 'admin4_code', 'admin5_code'];
+                $pkColsQuoted = implode(', ', array_map(fn($c) => $platform->quoteIdentifier($c), $pkCols));
+                $sql = sprintf("INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET %s = EXCLUDED.%s, %s = EXCLUDED.%s, %s = EXCLUDED.%s", $sqlTableName, $colsList, implode(', ', $placeholders), $pkColsQuoted, $nameCol, $nameCol, $asciiCol, $asciiCol, $gidCol, $gidCol);
+            }
+            $this->executeInternal($sql, $values); unset($rows, $placeholders, $values);
         }
         unset($adminData);
     }
@@ -416,19 +420,19 @@ class GeonameImporter
     private function disableLogging(): void
     {
         $conn = $this->em->getConnection(); $config = $conn->getConfiguration();
-        if (method_exists($config, 'setSQLLogger')) { $config->setSQLLogger(null); }
-        if (method_exists($config, 'setMiddlewares')) { $config->setMiddlewares([]); }
+        if (method_exists($config, 'setSQLLogger')) $config->setSQLLogger(null);
+        if (method_exists($config, 'setMiddlewares')) $config->setMiddlewares([]);
         $this->cachedLogger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
-        if ($this->cachedLogger && property_exists($this->cachedLogger, 'enabled')) { $this->cachedLogger->enabled = false; }
+        if ($this->cachedLogger && property_exists($this->cachedLogger, 'enabled')) $this->cachedLogger->enabled = false;
         $this->purgeLogger();
-        if (function_exists('gc_mem_caches')) { gc_mem_caches(); }
+        if (function_exists('gc_mem_caches')) gc_mem_caches();
         gc_collect_cycles(); $this->em->clear();
     }
 
     private function purgeLogger(): void
     {
         $config = $this->em->getConnection()->getConfiguration(); $logger = method_exists($config, 'getSQLLogger') ? $config->getSQLLogger() : null;
-        if ($logger) { if (method_exists($logger, 'clearQueries')) { $logger->clearQueries(); } elseif (property_exists($logger, 'queries')) { $logger->queries = []; } }
+        if ($logger) { if (method_exists($logger, 'clearQueries')) $logger->clearQueries(); elseif (property_exists($logger, 'queries')) $logger->queries = []; }
     }
 
     private function downloadFile(string $url): string
@@ -437,9 +441,9 @@ class GeonameImporter
         if (!is_dir($this->tmpDir)) mkdir($this->tmpDir, 0777, true);
         $tempFile = $this->tmpDir . DIRECTORY_SEPARATOR . uniqid('geoname_', true);
         $response = $this->httpClient->request('GET', $url);
-        if ($response->getStatusCode() !== 200) { throw new \RuntimeException("Failed to download: " . $response->getStatusCode()); }
+        if ($response->getStatusCode() !== 200) throw new \RuntimeException("Failed to download: " . $response->getStatusCode());
         $fileHandler = fopen($tempFile, 'w');
-        foreach ($this->httpClient->stream($response) as $chunk) { fwrite($fileHandler, $chunk->getContent()); }
+        foreach ($this->httpClient->stream($response) as $chunk) fwrite($fileHandler, $chunk->getContent());
         fclose($fileHandler); return $tempFile;
     }
 
@@ -521,11 +525,7 @@ class GeonameImporter
 
     private function getColumnMap(ClassMetadata $metadata): array
     {
-        $map = [];
-        foreach ($metadata->getFieldNames() as $fieldName) {
-            $map[$fieldName] = $metadata->getColumnName($fieldName);
-        }
-        return $map;
+        $map = []; foreach ($metadata->getFieldNames() as $f) $map[$f] = $metadata->getColumnName($f); return $map;
     }
 
     private function findExistingIds(string $entityClass, array $ids): array
