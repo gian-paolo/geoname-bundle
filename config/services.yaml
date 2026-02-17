@@ -15,6 +15,7 @@ services:
             $admin4Table: '%pallari_geoname.tables.admin4%'
             $admin5Table: '%pallari_geoname.tables.admin5%'
             $useFulltext: '%pallari_geoname.search.use_fulltext%'
+            $maxResults: '%pallari_geoname.search.max_results%'
 
     Pallari\GeonameBundle\Service\GeonameHierarchyService:
         arguments:
