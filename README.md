@@ -172,25 +172,46 @@ GeoNames organizes data into 5 administrative levels (Admin1 to Admin5). The mea
 
 ---
 
-## 🔍 Searching for Data
+## 🔍 Querying Data
 
-The bundle provides a high-performance `GeonameSearchService` to find cities and places with their administrative context (regions, provinces).
+The bundle provides a high-performance `GeonameSearchService` to find cities and places with their administrative context.
+
+### 1. General Search
+Search for toponyms using a hybrid strategy (LIKE + Full-Text).
 
 ```php
 use Pallari\GeonameBundle\Service\GeonameSearchService;
 
-public function searchExample(GeonameSearchService $searchService)
-{
-    $results = $searchService->search('Torino', [
-        'countries' => ['IT'],
-        'with_admin_names' => true, // Joins region/province names
-        'limit' => 5
-    ]);
-    
-    // Results include: geonameid, name, latitude, longitude, 
-    // population, admin1_name, admin1_id, admin2_name, admin2_id,
-    // admin3_name, admin3_id, admin4_name, admin4_id
-}
+$results = $searchService->search('Torino', [
+    'countries' => ['IT'],
+    'with_admin_names' => true, // Joins labels for regions/provinces
+    'limit' => 10,
+    'order_by' => 'population_desc', // Default: largest cities first
+    'select' => GeonameSearchService::PRESET_GEO // Or specific columns array
+]);
+```
+
+### 2. Get by ID
+Retrieve a single record by its `geonameid`.
+
+```php
+$city = $searchService->getById(3165524, true); 
+// Returns array with names, coordinates and admin labels (if true)
+```
+
+### 3. Hierarchy Navigation
+Get children or descendants of a specific administrative unit.
+
+```php
+// Example: Get all cities (ADM3) in the province of Turin (TO)
+$cities = $searchService->getChildren('IT', [
+    'admin1_code' => '09',
+    'admin2_code' => 'TO'
+], ['feature_codes' => ['ADM3']]);
+
+// Example: Get ALL descendants of a parent by its ID
+// This automatically resolves the administrative chain
+$allPlaces = $searchService->getDescendantsByParentId(3170831); // Piedmont Region ID
 ```
 
 ---

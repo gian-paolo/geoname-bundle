@@ -170,25 +170,46 @@ GeoNames organizza i dati in 5 livelli amministrativi (da Admin1 a Admin5). Il s
 
 ---
 
-## 🔍 Ricerca dei Dati
+## 🔍 Ricerca e Consultazione Dati
 
-Il bundle offre un servizio `GeonameSearchService` ad alte prestazioni per trovare città e località con il loro contesto amministrativo (regioni, province).
+Il bundle offre un servizio `GeonameSearchService` ad alte prestazioni per trovare città e località con il loro contesto amministrativo.
+
+### 1. Ricerca Generale
+Cerca toponimi usando una strategia ibrida (LIKE + Full-Text) ottimizzata.
 
 ```php
 use Pallari\GeonameBundle\Service\GeonameSearchService;
 
-public function searchExample(GeonameSearchService $searchService)
-{
-    $results = $searchService->search('Torino', [
-        'countries' => ['IT'],
-        'with_admin_names' => true, // Include i nomi di regione e provincia
-        'limit' => 5
-    ]);
-    
-    // I risultati includono: geonameid, name, latitude, longitude, 
-    // population, admin1_name, admin1_id, admin2_name, admin2_id,
-    // admin3_name, admin3_id, admin4_name, admin4_id
-}
+$results = $searchService->search('Torino', [
+    'countries' => ['IT'],
+    'with_admin_names' => true, // Include i nomi di regione/provincia/comune
+    'limit' => 10,
+    'order_by' => 'population_desc', // Default: città più popolose per prime
+    'select' => GeonameSearchService::PRESET_GEO // Solo id, nome e coordinate
+]);
+```
+
+### 2. Recupero per ID
+Ottieni i dati di un singolo toponimo tramite il suo `geonameid`.
+
+```php
+$city = $searchService->getById(3165524, true); 
+// Restituisce un array con nomi, coordinate e contesti amministrativi
+```
+
+### 3. Navigazione Gerarchica
+Recupera i "figli" o tutti i "discendenti" di un'unità amministrativa.
+
+```php
+// Esempio: Ottieni tutti i comuni (ADM3) della provincia di Torino (TO)
+$comuni = $searchService->getChildren('IT', [
+    'admin1_code' => '09',
+    'admin2_code' => 'TO'
+], ['feature_codes' => ['ADM3']]);
+
+// Esempio: Ottieni TUTTI i discendenti di un genitore tramite il suo ID
+// Il bundle risolve automaticamente la catena amministrativa
+$tuttoPiemonte = $searchService->getDescendantsByParentId(3170831); // ID Regione Piemonte
 ```
 
 ---
