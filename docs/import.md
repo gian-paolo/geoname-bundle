@@ -42,6 +42,20 @@ To keep your data perfectly in sync, it is highly recommended to schedule this c
 0 6 * * * php /path/to/your/project/bin/console pallari:geoname:sync --env=prod
 ```
 
+## 4. Removing a Country
+
+If you need to disable and clean up data for a specific country:
+
+```bash
+# Option 1: Mark as deleted (soft-delete)
+# Records remain in DB but are ignored by search service
+php bin/console pallari:geoname:remove-country IT
+
+# Option 2: Physically remove all records (force-delete)
+# Use this to free disk space
+php bin/console pallari:geoname:remove-country IT --force-delete
+```
+
 ## 📊 Monitoring Imports
 
 Every synchronization session is logged in the `geo_import` table. You can check:

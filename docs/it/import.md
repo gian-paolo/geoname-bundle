@@ -42,6 +42,20 @@ Per mantenere i dati perfettamente sincronizzati, è caldamente consigliato pian
 0 6 * * * php /path/to/your/project/bin/console pallari:geoname:sync --env=prod
 ```
 
+## 4. Rimozione di un Paese
+
+Se hai bisogno di disabilitare e pulire i dati per un paese specifico:
+
+```bash
+# Opzione 1: Segna come eliminato (soft-delete)
+# I record rimangono nel DB ma vengono ignorati dai servizi di ricerca
+php bin/console pallari:geoname:remove-country IT
+
+# Opzione 2: Rimozione fisica (force-delete)
+# Utilizza questa opzione per liberare spazio su disco
+php bin/console pallari:geoname:remove-country IT --force-delete
+```
+
 ## 📊 Monitoraggio Importazioni
 
 Ogni sessione di sincronizzazione viene registrata nella tabella `geo_import`. Puoi controllare:

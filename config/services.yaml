@@ -71,6 +71,21 @@ services:
             $geonameTable: '%pallari_geoname.tables.geoname%'
         tags: ['console.command']
 
+    Pallari\GeonameBundle\Command\RemoveCountryCommand:
+        arguments:
+            $em: '@doctrine.orm.entity_manager'
+            $geonameTable: '%pallari_geoname.tables.geoname%'
+            $countryEntityClass: '%pallari_geoname.entities.country%'
+            $adminTables:
+                adm1: '%pallari_geoname.tables.admin1%'
+                adm2: '%pallari_geoname.tables.admin2%'
+                adm3: '%pallari_geoname.tables.admin3%'
+                adm4: '%pallari_geoname.tables.admin4%'
+                adm5: '%pallari_geoname.tables.admin5%'
+            $alternateNameTable: '%pallari_geoname.tables.alternate_name%'
+            $hierarchyTable: '%pallari_geoname.tables.hierarchy%'
+        tags: ['console.command']
+
     Pallari\GeonameBundle\EventListener\TablePrefixListener:
         arguments:
             $entities:
